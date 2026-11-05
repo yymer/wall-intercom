@@ -42,6 +42,29 @@
         <item quantity="other">%d bilder</item>
     </plurals>
     <string name="choose_folder">Annan mapp…</string>
+    <string name="share_tip">Tips: för att lägga till bilder, markera dem i Foton (eller någon annan app), tryck på Dela och välj Wall Intercom. De hamnar i albumet \"Wall Intercom\".</string>
+    <string name="ok">OK</string>
+    <string name="share_nothing">Inget att lägga till: inga bilder delades.</string>
+    <string name="share_need_permission">Wall Intercom behöver tillgång till lagringen för att spara bilderna.</string>
+    <string name="share_in_slideshow">De kommer att visas i bildspelet.</string>
+    <string name="share_now_showing">Bildspelet visar nu det här albumet.</string>
+    <string name="share_show_album">Visa det här albumet</string>
+    <plurals name="share_adding">
+        <item quantity="one">Lägger till %d bild…</item>
+        <item quantity="other">Lägger till %d bilder…</item>
+    </plurals>
+    <plurals name="share_added">
+        <item quantity="one">La till %1$d bild i albumet \"%2$s\".</item>
+        <item quantity="other">La till %1$d bilder i albumet \"%2$s\".</item>
+    </plurals>
+    <plurals name="share_already">
+        <item quantity="one">%d fanns redan där.</item>
+        <item quantity="other">%d fanns redan där.</item>
+    </plurals>
+    <plurals name="share_failed">
+        <item quantity="one">%d kunde inte läggas till.</item>
+        <item quantity="other">%d kunde inte läggas till.</item>
+    </plurals>
     <string name="slide_seconds">Sekunder per bild</string>
     <string name="fill_screen">Fyll hela skärmen (beskär bilderna något)</string>
     <string name="h_screen">Skärm</string>

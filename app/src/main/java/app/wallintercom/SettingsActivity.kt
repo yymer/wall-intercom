@@ -57,6 +57,7 @@ class SettingsActivity : Activity() {
 
         heading(R.string.h_slideshow)
         sourceLabel = label(sourceText(), 18f)
+        label(getString(R.string.share_tip))
         button(R.string.choose_album) { chooseAlbum() }
         button(R.string.choose_folder) {
             startActivityForResult(

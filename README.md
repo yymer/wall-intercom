@@ -4,7 +4,8 @@ Turn two old Android tablets into wall-mounted **photo frames that double as a v
 between two rooms. No server, no cloud, no accounts: the tablets talk directly to each other
 over your home Wi-Fi.
 
-- Full-screen, cross-fading **slideshow** from a photo album on the tablet.
+- Full-screen, cross-fading **slideshow** from a photo album on the tablet. To add photos,
+  select them in Photos (or any app) → **Share → Wall Intercom**.
 - Touch the screen and two small buttons appear: **Call** and **Bell**. They stay for 25 s.
 - **Call** rings the other tablet: it wakes up and shows **Answer** / **Decline**. The camera
   and microphone stay off until someone there presses **Answer** (then a short chime plays
@@ -55,13 +56,14 @@ will refuse to install them over the old version.
    adb install -r -g wall-intercom.apk
    ```
    (`-g` grants camera, microphone and photo access up front.)
-2. Put your photos in an album on the tablet: download them, or make a new album in the
-   Gallery app and copy them there. (Albums that only exist in Google Photos' cloud won't show.)
+2. Add photos: select them in Google Photos, Files or any other app → **Share** →
+   **Wall Intercom**. They're copied into the album *Wall Intercom* (`Pictures/Wall Intercom`),
+   which the slideshow then shows. Sharing the same photo twice doesn't copy it again.
 3. Open **Wall Intercom**. Tap the screen, then **press and hold ⚙** (top right) for settings:
    - *Name of this room*, e.g. `Kitchen`. The two tablets must have different names.
    - *Other tablet's IP address*: shown at the top of the other tablet's settings.
-   - *Choose album…* → pick the album. (*Other folder…* picks any folder instead, e.g. on
-     an SD card.)
+   - Optional: *Choose album…* to show a different album on the tablet instead (e.g. Camera),
+     or *Other folder…* for any folder, e.g. on an SD card.
    - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*
      (Android 6 and newer; Android 5 doesn't have these).
    - **Save**.
@@ -141,7 +143,9 @@ adb logcat -d | grep CallManager
   caller re-opens the socket (`resume`) and does an ICE restart; the call only ends if it
   can't recover within 30 s.
 - `MainActivity`: slideshow, touch buttons, call screen, brightness.
-- `Albums`: lists the tablet's photo albums from Android's media library.
+- `Albums`: lists the tablet's photo albums from Android's media library, and copies shared
+  photos into the app's own album.
+- `ShareActivity`: the *Share → Wall Intercom* target.
 - `SettingsActivity`: the settings form.
 - Translations are in `app/src/main/res/values*/strings.xml`. To add a language, copy
   `values/strings.xml` to `values-xx/` and translate it.

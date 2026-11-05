@@ -43,6 +43,29 @@
         <item quantity="other">%d pictures</item>
     </plurals>
     <string name="choose_folder">Other folder…</string>
+    <string name="share_tip">Tip: to add photos, select them in Photos (or any app), press Share and choose Wall Intercom. They go into the album \"Wall Intercom\".</string>
+    <string name="ok">OK</string>
+    <string name="share_nothing">Nothing to add: no pictures were shared.</string>
+    <string name="share_need_permission">Wall Intercom needs access to storage to save the pictures.</string>
+    <string name="share_in_slideshow">They\'ll show up in the slideshow.</string>
+    <string name="share_now_showing">The slideshow now shows this album.</string>
+    <string name="share_show_album">Show this album</string>
+    <plurals name="share_adding">
+        <item quantity="one">Adding %d picture…</item>
+        <item quantity="other">Adding %d pictures…</item>
+    </plurals>
+    <plurals name="share_added">
+        <item quantity="one">Added %1$d picture to the album \"%2$s\".</item>
+        <item quantity="other">Added %1$d pictures to the album \"%2$s\".</item>
+    </plurals>
+    <plurals name="share_already">
+        <item quantity="one">%d was already there.</item>
+        <item quantity="other">%d were already there.</item>
+    </plurals>
+    <plurals name="share_failed">
+        <item quantity="one">%d couldn\'t be added.</item>
+        <item quantity="other">%d couldn\'t be added.</item>
+    </plurals>
     <string name="slide_seconds">Seconds per picture</string>
     <string name="fill_screen">Fill the whole screen (crops pictures slightly)</string>
     <string name="h_screen">Screen</string>
