@@ -7,8 +7,8 @@
     <string name="state_calling">Ringer %1$s…</string>
     <string name="state_connecting">Ansluter till %1$s…</string>
     <string name="hold_for_settings">Håll in ⚙ för att öppna inställningarna</string>
-    <string name="no_folder">Ingen bildmapp vald än.\n\nTryck på skärmen och håll sedan in ⚙ för att öppna inställningarna.</string>
-    <string name="no_pictures">Inga bilder hittades i den valda mappen.</string>
+    <string name="no_folder">Inget bildalbum valt än.\n\nTryck på skärmen och håll sedan in ⚙ för att öppna inställningarna.</string>
+    <string name="no_pictures">Inga bilder hittades i det valda albumet.</string>
     <string name="default_peer_name">andra rummet</string>
     <string name="default_my_name">Surfplatta</string>
     <string name="err_no_ip">Ange den andra surfplattans IP-adress i inställningarna</string>
@@ -31,9 +31,17 @@
     <string name="peer_ip">Andra surfplattans IP-adress</string>
     <string name="port">Port (måste vara samma på båda surfplattorna)</string>
     <string name="h_slideshow">Bildspel</string>
-    <string name="folder_none">Bildmapp: (ingen vald)</string>
-    <string name="folder">Bildmapp: %1$s</string>
-    <string name="choose_folder">Välj bildmapp…</string>
+    <string name="folder_none">Bilder: (inget valt)</string>
+    <string name="folder">Bilder: mappen %1$s</string>
+    <string name="album">Bilder: albumet \"%1$s\"</string>
+    <string name="choose_album">Välj album…</string>
+    <string name="no_albums">Hittade inga album med bilder på surfplattan</string>
+    <string name="need_photo_permission">Appen behöver tillgång till bilder för att visa album</string>
+    <plurals name="photo_count">
+        <item quantity="one">%d bild</item>
+        <item quantity="other">%d bilder</item>
+    </plurals>
+    <string name="choose_folder">Annan mapp…</string>
     <string name="slide_seconds">Sekunder per bild</string>
     <string name="fill_screen">Fyll hela skärmen (beskär bilderna något)</string>
     <string name="h_screen">Skärm</string>

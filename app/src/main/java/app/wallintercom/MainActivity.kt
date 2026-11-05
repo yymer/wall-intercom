@@ -11,8 +11,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Matrix
-import android.media.ExifInterface
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -23,6 +23,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.exifinterface.media.ExifInterface
 import org.webrtc.RendererCommon
 import org.webrtc.SurfaceViewRenderer
 import java.util.Calendar
@@ -65,6 +66,15 @@ class MainActivity : Activity(), CallManager.Listener {
         IntercomService.start(this)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (Build.VERSION.SDK_INT < 27) {
+            // Android 8.0 and older ignore showWhenLocked/turnScreenOn in the manifest.
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            )
+        }
         setContentView(R.layout.activity_main)
 
         imgA = findViewById(R.id.imgA)
@@ -120,9 +130,15 @@ class MainActivity : Activity(), CallManager.Listener {
             true
         }
 
-        val missing = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
-            .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
-        if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 1)
+        // Before Android 6 permissions are granted at install time.
+        if (Build.VERSION.SDK_INT >= 23) {
+            val missing = arrayOf(
+                Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.READ_EXTERNAL_STORAGE, // for the photo album
+            )
+                .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+            if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 1)
+        }
     }
 
     override fun onResume() {
@@ -137,7 +153,7 @@ class MainActivity : Activity(), CallManager.Listener {
         CallManager.lastBell?.let { (from, at) ->
             if (at > bellShownAt && System.currentTimeMillis() - at < 60_000) onBell(from)
         }
-        // Re-read the folder every time we come back (settings may have changed).
+        // Re-read the album/folder every time we come back (settings may have changed).
         images = emptyList()
         slideIndex = 0
         nextSlide()
@@ -298,13 +314,19 @@ class MainActivity : Activity(), CallManager.Listener {
 
     /** Only does anything if the app was made device owner via adb (optional, see README). */
     private fun lockTaskIfDeviceOwner() {
-        val dpm = getSystemService(DevicePolicyManager::class.java)
+        val dpm = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
         if (!dpm.isDeviceOwnerApp(packageName)) return
         val admin = ComponentName(this, AdminReceiver::class.java)
         dpm.setLockTaskPackages(admin, arrayOf(packageName))
-        dpm.setKeyguardDisabled(admin, true)
-        val am = getSystemService(ActivityManager::class.java)
-        if (am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) startLockTask()
+        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        val locked = if (Build.VERSION.SDK_INT >= 23) {
+            dpm.setKeyguardDisabled(admin, true) // Android 5 has no API for this
+            am.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE
+        } else {
+            @Suppress("DEPRECATION")
+            am.isInLockTaskMode
+        }
+        if (!locked) startLockTask()
     }
 
     // ---------------------------------------------------------------- slideshow
@@ -314,7 +336,7 @@ class MainActivity : Activity(), CallManager.Listener {
         if (!resumed) return
         if (overlay.visibility != View.VISIBLE && CallManager.state == CallState.IDLE) setBrightness(false)
         if (slideIndex >= images.size) {
-            // End of a round (or first start): re-scan the folder so new photos show up, reshuffle.
+            // End of a round (or first start): re-scan so new photos show up, reshuffle.
             reloadFolder {
                 if (images.isEmpty()) {
                     showHint()
@@ -329,7 +351,7 @@ class MainActivity : Activity(), CallManager.Listener {
     }
 
     private fun showHint() {
-        hint.text = if (prefs.folderUri == null) {
+        hint.text = if (prefs.albumId == null && prefs.folderUri == null) {
             getString(R.string.no_folder)
         } else {
             getString(R.string.no_pictures)
@@ -338,9 +360,14 @@ class MainActivity : Activity(), CallManager.Listener {
     }
 
     private fun reloadFolder(then: () -> Unit) {
+        val albumId = prefs.albumId
         val uri = prefs.folderUri
         io.execute {
-            val list = uri?.let { listImages(Uri.parse(it)) } ?: emptyList()
+            val list = when {
+                albumId != null -> Albums.images(contentResolver, albumId)
+                uri != null -> listImages(Uri.parse(uri))
+                else -> emptyList()
+            }
             handler.post {
                 images = list.shuffled()
                 slideIndex = 0

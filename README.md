@@ -4,7 +4,7 @@ Turn two old Android tablets into wall-mounted **photo frames that double as a v
 between two rooms. No server, no cloud, no accounts: the tablets talk directly to each other
 over your home Wi-Fi.
 
-- Full-screen, cross-fading **slideshow** from a folder on the tablet.
+- Full-screen, cross-fading **slideshow** from a photo album on the tablet.
 - Touch the screen and two small buttons appear: **Call** and **Bell**. They stay for 25 s.
 - **Call** rings the other tablet: it wakes up and shows **Answer** / **Decline**. The camera
   and microphone stay off until someone there presses **Answer** (then a short chime plays
@@ -20,7 +20,8 @@ over your home Wi-Fi.
 - Dims at night, keeps itself running, survives reboots (it acts as the home screen).
 - English and Swedish, following each tablet's language setting.
 
-Tested on two Lenovo Tab M10 (TB-X505F) running Android 10.
+Tested on two Lenovo Tab M10 (TB-X505F) running Android 10 and a Lenovo Tab 3 7" (TB3-710F)
+running Android 5.0.1.
 
 | Touch the photo: Call and Bell | Bell ringing on the other tablet | The other tablet got the bell |
 |---|---|---|
@@ -30,7 +31,8 @@ Tested on two Lenovo Tab M10 (TB-X505F) running Android 10.
 
 ## Requirements
 
-- Two Android tablets with **Android 10 or newer** and a front camera.
+- Two Android tablets with **Android 5.0 or newer** and a front camera. Very old tablets may
+  struggle with HD video; the default 640×480 is the safe choice.
 - Both on the **same network**. Give each a fixed IP address (a DHCP reservation in your router).
 - A computer with `adb` to install the app (and JDK 17/21 + Android SDK if you build it yourself).
 
@@ -52,13 +54,16 @@ will refuse to install them over the old version.
    ```bash
    adb install -r -g wall-intercom.apk
    ```
-   (`-g` grants camera and microphone up front.)
-2. Copy your photos into a folder on the tablet, e.g. `Pictures/Wall`.
+   (`-g` grants camera, microphone and photo access up front.)
+2. Put your photos in an album on the tablet: download them, or make a new album in the
+   Gallery app and copy them there. (Albums that only exist in Google Photos' cloud won't show.)
 3. Open **Wall Intercom**. Tap the screen, then **press and hold ⚙** (top right) for settings:
    - *Name of this room*, e.g. `Kitchen`. The two tablets must have different names.
    - *Other tablet's IP address*: shown at the top of the other tablet's settings.
-   - *Choose photo folder…* → pick the folder → *Use this folder* → *Allow*.
-   - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*.
+   - *Choose album…* → pick the album. (*Other folder…* picks any folder instead, e.g. on
+     an SD card.)
+   - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*
+     (Android 6 and newer; Android 5 doesn't have these).
    - **Save**.
 4. Press the tablet's Home button and choose **Wall Intercom → Always**. It is now the home
    screen, so it comes back by itself after a reboot or if someone leaves it.
@@ -73,7 +78,7 @@ The port (default 47555) must be the same on both tablets.
 
 | Setting | Default | Notes |
 |---|---|---|
-| Seconds per picture | 20 | Photos are shuffled; the folder is re-scanned every round |
+| Seconds per picture | 20 | Photos are shuffled; the album is re-scanned every round |
 | Fill the whole screen | on | Crops pictures slightly instead of showing black bars |
 | Brightness while showing pictures | 40% | Full brightness when touched or in a call |
 | Night hours / night brightness | 22–07, 2% | 0% turns the backlight off; a touch, call or bell wakes it |
@@ -123,7 +128,7 @@ adb logcat -d | grep CallManager
 - **Echo or noise**: turn off Dolby/sound enhancements, lower *Call volume*, or try the
   *built-in echo cancellation* setting.
 - **App stops answering after a while**: press *Don't let Android put this app to sleep* in
-  settings. Some manufacturers have extra battery savers in their own settings apps.
+  settings (Android 6 and newer). Some manufacturers have extra battery savers in their own settings apps.
 
 ## How it works
 
@@ -136,6 +141,7 @@ adb logcat -d | grep CallManager
   caller re-opens the socket (`resume`) and does an ICE restart; the call only ends if it
   can't recover within 30 s.
 - `MainActivity`: slideshow, touch buttons, call screen, brightness.
+- `Albums`: lists the tablet's photo albums from Android's media library.
 - `SettingsActivity`: the settings form.
 - Translations are in `app/src/main/res/values*/strings.xml`. To add a language, copy
   `values/strings.xml` to `values-xx/` and translate it.

@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 
@@ -24,14 +25,22 @@ class IntercomService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, getString(R.string.notif_channel), NotificationManager.IMPORTANCE_LOW))
+        val builder = if (Build.VERSION.SDK_INT >= 26) {
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL, getString(R.string.notif_channel), NotificationManager.IMPORTANCE_LOW)
+            )
+            Notification.Builder(this, CHANNEL)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this).setPriority(Notification.PRIORITY_LOW)
+        }
         val pi = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
         startForeground(
             1,
-            Notification.Builder(this, CHANNEL)
+            builder
                 .setSmallIcon(R.drawable.ic_stat)
                 .setContentTitle(getString(R.string.app_name))
                 .setContentText(getString(R.string.notif_text))
@@ -43,11 +52,11 @@ class IntercomService : Service() {
         CallManager.init(this)
         CallManager.onWakeUp = { wakeAndShow() }
 
-        cpuLock = getSystemService(PowerManager::class.java)
+        cpuLock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "wallintercom:cpu")
             .apply { setReferenceCounted(false); acquire() }
         @Suppress("DEPRECATION")
-        wifiLock = applicationContext.getSystemService(WifiManager::class.java)
+        wifiLock = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager)
             .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "wallintercom:wifi")
             .apply { setReferenceCounted(false); acquire() }
     }
@@ -62,7 +71,7 @@ class IntercomService : Service() {
 
     private fun wakeAndShow() {
         @Suppress("DEPRECATION")
-        getSystemService(PowerManager::class.java)
+        (getSystemService(Context.POWER_SERVICE) as PowerManager)
             .newWakeLock(
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
                 "wallintercom:wake"
@@ -77,7 +86,8 @@ class IntercomService : Service() {
     companion object {
         private const val CHANNEL = "intercom"
         fun start(ctx: Context) {
-            ctx.startForegroundService(Intent(ctx, IntercomService::class.java))
+            val i = Intent(ctx, IntercomService::class.java)
+            if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i) else ctx.startService(i)
         }
     }
 }

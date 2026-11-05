@@ -27,6 +27,9 @@ class Prefs(ctx: Context) {
     var peerName: String get() = str("peerName", res.getString(R.string.default_peer_name)); set(v) = put("peerName", v)
     var port: Int get() = int("port", 47555); set(v) = put("port", v)
 
+    /** The slideshow shows either an album (gallery folder) or a folder picked with "Other folder…". */
+    var albumId: String? get() = p.getString("albumId", null); set(v) = put("albumId", v)
+    var albumName: String? get() = p.getString("albumName", null); set(v) = put("albumName", v)
     var folderUri: String? get() = p.getString("folderUri", null); set(v) = put("folderUri", v)
     var slideSeconds: Int get() = int("slideSeconds", 20); set(v) = put("slideSeconds", v)
     var fillScreen: Boolean get() = bool("fillScreen", true); set(v) = put("fillScreen", v)

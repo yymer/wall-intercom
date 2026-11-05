@@ -1,8 +1,13 @@
 package app.wallintercom
 
+import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.DocumentsContract
@@ -10,6 +15,9 @@ import android.provider.Settings
 import android.text.InputType
 import android.util.TypedValue
 import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
+import android.widget.ImageView
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -23,7 +31,7 @@ import java.net.NetworkInterface
 class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var col: LinearLayout
-    private lateinit var folderLabel: TextView
+    private lateinit var sourceLabel: TextView
     private val savers = mutableListOf<() -> Unit>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,9 +56,15 @@ class SettingsActivity : Activity() {
         intField(R.string.port, prefs.port, 1024..65535) { prefs.port = it }
 
         heading(R.string.h_slideshow)
-        folderLabel = label(folderText(), 18f)
+        sourceLabel = label(sourceText(), 18f)
+        button(R.string.choose_album) { chooseAlbum() }
         button(R.string.choose_folder) {
-            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQ_FOLDER)
+            startActivityForResult(
+                Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                    // Show internal storage right away (Android 5 hides it behind a menu).
+                    .putExtra("android.content.extra.SHOW_ADVANCED", true),
+                REQ_FOLDER,
+            )
         }
         intField(R.string.slide_seconds, prefs.slideSeconds, 5..86400) { prefs.slideSeconds = it }
         checkBox(R.string.fill_screen, prefs.fillScreen) { prefs.fillScreen = it }
@@ -74,18 +88,21 @@ class SettingsActivity : Activity() {
         checkBox(R.string.hw_echo, prefs.hwEcho) { prefs.hwEcho = it }
 
         heading(R.string.h_permissions)
-        button(R.string.allow_overlay) {
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-        }
-        button(R.string.allow_battery) {
-            val pm = getSystemService(PowerManager::class.java)
-            if (pm.isIgnoringBatteryOptimizations(packageName)) {
-                toast(getString(R.string.already_allowed))
-            } else {
-                @Suppress("BatteryLife")
-                startActivity(
-                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
-                )
+        // Android 5 has neither of these restrictions, so nothing to allow there.
+        if (Build.VERSION.SDK_INT >= 23) {
+            button(R.string.allow_overlay) {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            }
+            button(R.string.allow_battery) {
+                val pm = getSystemService(POWER_SERVICE) as PowerManager
+                if (pm.isIgnoringBatteryOptimizations(packageName)) {
+                    toast(getString(R.string.already_allowed))
+                } else {
+                    @Suppress("BatteryLife")
+                    startActivity(
+                        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
+                    )
+                }
             }
         }
         button(R.string.open_android_settings) {
@@ -126,11 +143,96 @@ class SettingsActivity : Activity() {
         if (requestCode == REQ_FOLDER && resultCode == RESULT_OK && uri != null) {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             prefs.folderUri = uri.toString()
-            folderLabel.text = folderText()
+            prefs.albumId = null
+            prefs.albumName = null
+            sourceLabel.text = sourceText()
         }
     }
 
-    private fun folderText(): String {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, results: IntArray) {
+        if (requestCode != REQ_READ) return
+        if (results.firstOrNull() == PackageManager.PERMISSION_GRANTED) showAlbums()
+        else toast(getString(R.string.need_photo_permission))
+    }
+
+    // ---------------------------------------------------------------- albums
+
+    private fun chooseAlbum() {
+        val perm = Manifest.permission.READ_EXTERNAL_STORAGE
+        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(perm), REQ_READ)
+        } else {
+            showAlbums()
+        }
+    }
+
+    private fun showAlbums() {
+        Thread {
+            val albums = Albums.list(contentResolver)
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                if (albums.isEmpty()) {
+                    toast(getString(R.string.no_albums))
+                    return@runOnUiThread
+                }
+                val adapter = AlbumAdapter(albums)
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.choose_album)
+                    .setAdapter(adapter) { _, which ->
+                        val a = albums[which]
+                        prefs.albumId = a.id
+                        prefs.albumName = a.name
+                        prefs.folderUri = null
+                        sourceLabel.text = sourceText()
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+                adapter.loadThumbnails()
+            }
+        }.start()
+    }
+
+    private inner class AlbumAdapter(val albums: List<Albums.Album>) : BaseAdapter() {
+        private val thumbs = HashMap<String, Bitmap>()
+
+        fun loadThumbnails() = Thread {
+            for (a in albums) {
+                val bmp = Albums.thumbnail(contentResolver, a.coverId) ?: continue
+                runOnUiThread {
+                    thumbs[a.id] = bmp
+                    notifyDataSetChanged()
+                }
+            }
+        }.start()
+
+        override fun getCount() = albums.size
+        override fun getItem(position: Int) = albums[position]
+        override fun getItemId(position: Int) = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+            val row = convertView as? LinearLayout ?: LinearLayout(this@SettingsActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(16), dp(8), dp(16), dp(8))
+                addView(ImageView(context).apply {
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    setBackgroundColor(0xFFDDDDDD.toInt())
+                }, LinearLayout.LayoutParams(dp(72), dp(72)))
+                addView(TextView(context).apply {
+                    textSize = 20f
+                    setPadding(dp(16), 0, 0, 0)
+                })
+            }
+            val a = albums[position]
+            (row.getChildAt(0) as ImageView).setImageBitmap(thumbs[a.id])
+            (row.getChildAt(1) as TextView).text =
+                "${a.name}\n" + resources.getQuantityString(R.plurals.photo_count, a.count, a.count)
+            return row
+        }
+    }
+
+    private fun sourceText(): String {
+        prefs.albumName?.let { if (prefs.albumId != null) return getString(R.string.album, it) }
         val uri = prefs.folderUri ?: return getString(R.string.folder_none)
         return try {
             getString(R.string.folder, DocumentsContract.getTreeDocumentId(Uri.parse(uri)))
@@ -221,5 +323,6 @@ class SettingsActivity : Activity() {
 
     companion object {
         private const val REQ_FOLDER = 10
+        private const val REQ_READ = 11
     }
 }

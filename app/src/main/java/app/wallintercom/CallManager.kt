@@ -840,8 +840,10 @@ object CallManager {
 
     // ---------------------------------------------------------------- audio
 
+    private fun audioManager() = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
     private fun startCallAudio() {
-        val am = ctx.getSystemService(AudioManager::class.java)
+        val am = audioManager()
         savedAudioMode = am.mode
         am.mode = AudioManager.MODE_IN_COMMUNICATION
         am.isSpeakerphoneOn = true
@@ -854,7 +856,7 @@ object CallManager {
     private fun stopCallAudio() {
         if (!audioActive) return
         audioActive = false
-        val am = ctx.getSystemService(AudioManager::class.java)
+        val am = audioManager()
         am.isSpeakerphoneOn = false
         am.mode = savedAudioMode
     }
