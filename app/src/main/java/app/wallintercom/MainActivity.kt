@@ -39,6 +39,7 @@ class MainActivity : Activity(), CallManager.Listener {
     private lateinit var localView: SurfaceViewRenderer
     private lateinit var overlay: View
     private lateinit var callBtn: Button
+    private lateinit var bellBtn: Button
     private lateinit var peerStatus: TextView
     private lateinit var callPanel: View
     private lateinit var callStatus: TextView
@@ -71,6 +72,7 @@ class MainActivity : Activity(), CallManager.Listener {
         localView = findViewById(R.id.localView)
         overlay = findViewById(R.id.overlay)
         callBtn = findViewById(R.id.callBtn)
+        bellBtn = findViewById(R.id.bellBtn)
         peerStatus = findViewById(R.id.peerStatus)
         callPanel = findViewById(R.id.callPanel)
         callStatus = findViewById(R.id.callStatus)
@@ -92,6 +94,10 @@ class MainActivity : Activity(), CallManager.Listener {
         callBtn.setOnClickListener {
             hideOverlay()
             CallManager.dial()
+        }
+        bellBtn.setOnClickListener {
+            hideOverlay()
+            CallManager.sendBell()
         }
         findViewById<Button>(R.id.endBtn).setOnClickListener { CallManager.hangup() }
         val settingsBtn = findViewById<View>(R.id.settingsBtn)
@@ -115,6 +121,10 @@ class MainActivity : Activity(), CallManager.Listener {
         CallManager.listener = this
         onCallState(CallManager.state, prefs.peerName, null)
         updateCallButton()
+        // A bell that arrived while we were in the background (or the screen was off).
+        CallManager.lastBell?.let { (from, at) ->
+            if (at > bellShownAt && System.currentTimeMillis() - at < 60_000) onBell(from)
+        }
         // Re-read the folder every time we come back (settings may have changed).
         images = emptyList()
         slideIndex = 0
@@ -160,6 +170,7 @@ class MainActivity : Activity(), CallManager.Listener {
             CallState.DIALING -> getString(R.string.state_calling, peer)
             CallState.CONNECTING -> getString(R.string.state_connecting, peer)
             CallState.IN_CALL -> peer
+            CallState.RECONNECTING -> getString(R.string.state_reconnecting)
             CallState.IDLE -> ""
         }
         if (inCall) {
@@ -175,8 +186,20 @@ class MainActivity : Activity(), CallManager.Listener {
 
     override fun onPeerStatus(online: Boolean, peer: String) = updateCallButton()
 
+    private var bellShownAt = 0L
+
+    override fun onBell(from: String) {
+        bellShownAt = System.currentTimeMillis()
+        if (CallManager.state != CallState.IDLE) return
+        showOverlay() // so they can call back right away
+        handler.removeCallbacks(hideOverlayRunnable)
+        handler.postDelayed(hideOverlayRunnable, 60_000)
+        showMessage(getString(R.string.bell_from, from), 60_000)
+    }
+
     private fun updateCallButton() {
         callBtn.setText(R.string.call_button)
+        bellBtn.setText(R.string.bell_button)
         if (CallManager.peerOnline) {
             peerStatus.setText(R.string.status_online)
             peerStatus.setTextColor(Color.parseColor("#7CE38B"))
@@ -203,16 +226,17 @@ class MainActivity : Activity(), CallManager.Listener {
 
     private fun hideOverlay() {
         handler.removeCallbacks(hideOverlayRunnable)
+        if (message.visibility == View.VISIBLE) message.visibility = View.GONE
         overlay.visibility = View.GONE
         hint.alpha = 1f
         if (CallManager.state == CallState.IDLE) setBrightness(false)
     }
 
-    private fun showMessage(text: String) {
+    private fun showMessage(text: String, durationMs: Long = 5_000) {
         message.text = text
         message.visibility = View.VISIBLE
         handler.removeCallbacks(hideMessageRunnable)
-        handler.postDelayed(hideMessageRunnable, 5_000)
+        handler.postDelayed(hideMessageRunnable, durationMs)
     }
 
     // ---------------------------------------------------------------- screen

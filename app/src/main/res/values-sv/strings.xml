@@ -54,4 +54,9 @@
     <string name="save">Spara</string>
     <string name="cancel">Avbryt</string>
     <string name="saved">Sparat</string>
+    <string name="bell_button">Pling</string>
+    <string name="bell_sent">Pling skickat till %1$s</string>
+    <string name="bell_from">🔔 Det plingar från %1$s</string>
+    <string name="bell_volume">Volym för pling (%)</string>
+    <string name="state_reconnecting">Återansluter…</string>
 </resources>

@@ -41,7 +41,7 @@ class IntercomService : Service() {
         )
 
         CallManager.init(this)
-        CallManager.onIncomingCall = { wakeAndShow() }
+        CallManager.onWakeUp = { wakeAndShow() }
 
         cpuLock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "wallintercom:cpu")

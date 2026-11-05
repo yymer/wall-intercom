@@ -4,11 +4,16 @@ A photo-frame + video-intercom app for two Android 10 tablets on the same Wi-Fi.
 No server: the tablets talk directly to each other.
 
 - Shows a full-screen, cross-fading slideshow from a folder on the tablet.
-- Tap the screen → big **Call &lt;other room&gt;** button.
+- Tap the screen → small **Call** and **Bell** buttons appear.
 - The other tablet **answers automatically**: wakes the screen, plays a short chime,
   and the call starts. Either side can press **End call**.
+- **Bell** button: rings a ding-dong on the other tablet and shows "🔔 Bell from …"
+  with the Call button ready, without turning on any camera.
+- If Wi-Fi hiccups during a call, it shows "Reconnecting…" and recovers by itself
+  (up to 30 s) instead of hanging up.
 - Calls hang up automatically after 15 minutes (configurable), so a forgotten call
   doesn't leave a camera on all night.
+- English and Swedish, following each tablet's language setting.
 
 ## Build
 
@@ -38,6 +43,8 @@ Uses JDK 21 in `~/.local/opt` and the Android SDK in `~/Android/Sdk`.
    screen, so it comes back by itself after a reboot or if someone leaves it.
 6. Android settings → *Security → Screen lock* → **None**, so incoming calls aren't stuck
    behind the lock screen.
+7. **Lenovo tablets: turn Dolby Atmos off** (Settings → Sound). With Dolby on, the echo
+   cancellation can't recognise the tablet's own speaker sound and you get echo/noise.
 
 The port (default 47555) must be the same on both tablets.
 
@@ -63,7 +70,8 @@ uninstalling the app afterwards) requires a factory reset, so try the app withou
 | Night hours / night brightness | 22–07, 2% | 0% turns the backlight off; a touch or call wakes it |
 | Seconds per picture | 20 | Photos are shuffled; folder is re-scanned every round |
 | HD video | off | 640×480 by default — safest for old tablets |
-| Built-in echo cancellation | off | Try it if you get echo with the default |
+| Bell volume | 80% | Plays on the *alarm* volume channel |
+| Built-in echo cancellation | off | WebRTC's own works better on the Lenovos (with Dolby off) |
 
 ## How it works
 
@@ -71,7 +79,9 @@ uninstalling the app afterwards) requires a factory reset, so try the app withou
   always reachable; wakes the screen on an incoming call.
 - `CallManager` – listens on TCP 47555. Calling = connecting to the other tablet and
   exchanging one-line JSON messages (`hello` → `ok`, WebRTC `offer`/`answer`/`ice`, `bye`).
-  A `ping`/`pong` every 20 s drives the "Online" indicator. Audio/video is WebRTC,
-  peer-to-peer on the LAN (no STUN/TURN).
+  A `ping`/`pong` every 20 s drives the "Online" indicator; `bell` rings the other tablet.
+  Audio/video is WebRTC, peer-to-peer on the LAN (no STUN/TURN). On a network hiccup the
+  caller re-opens the socket (`resume`) and does an ICE restart; the call only ends if it
+  can't recover within 30 s.
 - `MainActivity` – slideshow, touch overlay, call screen, brightness.
 - `SettingsActivity` – the settings form.

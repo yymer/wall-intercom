@@ -1,6 +1,8 @@
 package app.wallintercom
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Handler
@@ -34,11 +36,12 @@ import org.webrtc.audio.JavaAudioDeviceModule
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
-enum class CallState { IDLE, DIALING, CONNECTING, IN_CALL }
+enum class CallState { IDLE, DIALING, CONNECTING, IN_CALL, RECONNECTING }
 
 /** Forwards video frames to whatever renderer is currently attached. */
 class ProxyVideoSink : VideoSink {
@@ -54,20 +57,30 @@ class ProxyVideoSink : VideoSink {
  *
  * Signalling: each tablet listens on a TCP port. The caller connects to the other tablet's IP
  * and the two exchange one-line JSON messages:
- *   caller -> hello{name}        callee -> ok{name} (auto-answer) | busy
+ *   caller -> hello{name,sid}    callee -> ok{name} (auto-answer) | busy
  *   caller -> offer{sdp}         callee -> answer{sdp}
- *   both   -> ice{mid,idx,sdp}   either -> bye   (closing the socket also ends the call)
- *   ping{name} -> pong{name}     (on a separate short connection, for the "online" indicator)
+ *   both   -> ice{mid,idx,sdp}   either -> bye
+ *   caller -> resume{name,sid}   callee -> resumed | gone   (new socket after the old one died)
+ *   ping{name} -> pong{name}     (separate short connection, for the "online" indicator)
+ *   bell{name} -> bellok         (separate short connection, rings the bell on the other tablet)
+ *
+ * If the network hiccups during a call (ICE disconnected/failed or the signalling socket dies),
+ * the call goes to RECONNECTING for up to [RECONNECT_GRACE_MS]. The caller re-opens the
+ * signalling socket if needed ("resume") and does an ICE restart; the callee just waits.
  *
  * All call state is only touched on the single [exec] thread.
  */
 object CallManager {
     private const val TAG = "CallManager"
     private const val CONNECT_TIMEOUT_MS = 20_000L
+    private const val RECONNECT_GRACE_MS = 30_000L
+    private const val RECONNECT_TICK_MS = 3_000L
+    private const val ICE_RESTART_INTERVAL_MS = 6_000L
 
     interface Listener {
         fun onCallState(state: CallState, peer: String, info: String?)
         fun onPeerStatus(online: Boolean, peer: String)
+        fun onBell(from: String)
     }
 
     private lateinit var ctx: Context
@@ -82,8 +95,13 @@ object CallManager {
 
     /** Set/cleared by the visible activity, main thread only. */
     var listener: Listener? = null
-    /** Called on the main thread when a call comes in (wake screen + show activity). */
-    var onIncomingCall: (() -> Unit)? = null
+    /** Called on the main thread on an incoming call or bell (wake screen + show activity). */
+    var onWakeUp: (() -> Unit)? = null
+
+    /** Last bell received: (from, time). The activity shows it when it comes to the front. */
+    @Volatile
+    var lastBell: Pair<String, Long>? = null
+        private set
 
     @Volatile
     var state = CallState.IDLE
@@ -110,6 +128,11 @@ object CallManager {
     private var iceState: PeerConnection.IceConnectionState? = null
     private var audioActive = false
     private var savedAudioMode = AudioManager.MODE_NORMAL
+    private var sessionId = ""
+    private var isCaller = false
+    private var reconnectDeadline = 0L
+    private var lastIceRestart = 0L
+    private var resumeInFlight = false
 
     @Volatile
     private var serverSocket: ServerSocket? = null
@@ -153,8 +176,10 @@ object CallManager {
         }
         val c = newConn(socket)
         conn = c
+        isCaller = true
+        sessionId = UUID.randomUUID().toString()
         c.start()
-        c.send(msg("hello").put("name", prefs.myName))
+        c.send(msg("hello").put("name", prefs.myName).put("sid", sessionId))
         armTimeout(id)
     }
 
@@ -164,6 +189,32 @@ object CallManager {
     }
 
     fun pingNow() = timers.execute { pingPeer() }
+
+    /** Rings the bell on the other tablet. Result is reported as an info message. */
+    fun sendBell() = timers.execute {
+        val ip = prefs.peerIp.trim()
+        if (ip.isEmpty()) {
+            notifyInfo(ctx.getString(R.string.err_no_ip)); return@execute
+        }
+        val ok = try {
+            Socket().use { s ->
+                s.connect(InetSocketAddress(ip, prefs.port), 3000)
+                s.soTimeout = 3000
+                val out = s.getOutputStream()
+                out.write((msg("bell").put("name", prefs.myName).toString() + "\n").toByteArray())
+                out.flush()
+                JSONObject(s.getInputStream().bufferedReader().readLine() ?: "{}").optString("t") == "bellok"
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "bell failed: ${e.message}")
+            false
+        }
+        setPeer(ok)
+        notifyInfo(
+            if (ok) ctx.getString(R.string.bell_sent, prefs.peerName)
+            else ctx.getString(R.string.err_unreachable, prefs.peerName)
+        )
+    }
 
     /** Re-bind the listening socket (e.g. after the port changed). */
     fun restartListener() {
@@ -238,21 +289,32 @@ object CallManager {
                 c.send(msg("pong").put("name", prefs.myName))
                 c.close()
             }
-            "hello" -> onHello(c, m.optString("name"))
+            "bell" -> {
+                c.send(msg("bellok"))
+                c.close()
+                onBellReceived(m.optString("name").ifBlank { prefs.peerName })
+            }
+            "hello" -> onHello(c, m.optString("name"), m.optString("sid"))
+            "resume" -> onResumeRequest(c, m.optString("sid"))
             else -> if (c === conn) onCallMessage(m)
         }
     }
 
-    private fun onHello(c: Conn, from: String) {
+    private fun onHello(c: Conn, from: String, sid: String) {
         when {
-            state == CallState.IDLE -> accept(c, from)
+            state == CallState.IDLE -> accept(c, from, sid)
+            // The other tablet gave up on a broken call and is calling again: start over.
+            state == CallState.RECONNECTING && from == prefs.peerName -> {
+                endCall(null, notifyPeer = false)
+                accept(c, from, sid)
+            }
             // Both pressed "call" at the same moment: the tablet whose name sorts first keeps
             // its outgoing call, the other one drops its own and accepts.
             state == CallState.DIALING && prefs.myName > from -> {
                 val old = conn
                 conn = null
                 old?.close()
-                accept(c, from)
+                accept(c, from, sid)
             }
             else -> {
                 c.send(msg("busy"))
@@ -261,13 +323,15 @@ object CallManager {
         }
     }
 
-    private fun accept(c: Conn, from: String) {
+    private fun accept(c: Conn, from: String, sid: String) {
         conn = c
+        isCaller = false
+        sessionId = sid
         val id = ++callId
         if (from.isNotBlank()) prefs.peerName = from
         setState(CallState.CONNECTING)
         c.send(msg("ok").put("name", prefs.myName))
-        main.post { onIncomingCall?.invoke() }
+        main.post { onWakeUp?.invoke() }
         chime()
         if (!startMedia()) return
         armTimeout(id)
@@ -292,12 +356,151 @@ object CallManager {
                 Log.i(TAG, "other tablet hung up")
                 endCall(null, notifyPeer = false)
             }
+            "resumed" -> if (state == CallState.RECONNECTING) {
+                if (iceConnected()) {
+                    Log.i(TAG, "signalling resumed, media never stopped")
+                    setState(CallState.IN_CALL)
+                } else {
+                    Log.i(TAG, "signalling resumed, restarting ICE")
+                    createOffer(iceRestart = true)
+                }
+            }
+            "gone" -> endCall(ctx.getString(R.string.err_lost), notifyPeer = false)
         }
     }
 
     private fun onClosed(c: Conn) {
         if (c !== conn) return
-        endCall(if (state == CallState.IN_CALL) null else ctx.getString(R.string.err_not_connected), notifyPeer = false)
+        if (state == CallState.IN_CALL || state == CallState.RECONNECTING) {
+            // Network hiccup: keep the call, try to get the signalling back.
+            Log.i(TAG, "signalling socket lost during call")
+            conn = null
+            startReconnecting()
+            return
+        }
+        endCall(ctx.getString(R.string.err_not_connected), notifyPeer = false)
+    }
+
+    // ---------------------------------------------------------------- reconnecting
+
+    private fun startReconnecting() {
+        if (state == CallState.RECONNECTING) return
+        Log.i(TAG, "reconnecting (caller=$isCaller)")
+        setState(CallState.RECONNECTING)
+        reconnectDeadline = System.currentTimeMillis() + RECONNECT_GRACE_MS
+        lastIceRestart = System.currentTimeMillis() - ICE_RESTART_INTERVAL_MS / 2
+        scheduleReconnectTick(callId)
+    }
+
+    private fun scheduleReconnectTick(id: Int) {
+        timers.schedule({ exec.execute { reconnectTick(id) } }, RECONNECT_TICK_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun reconnectTick(id: Int) {
+        if (callId != id || state != CallState.RECONNECTING) return
+        val now = System.currentTimeMillis()
+        // Audio/video still flowing (only the signalling socket died): no reason to give up.
+        if (iceConnected()) reconnectDeadline = now + RECONNECT_GRACE_MS
+        if (now > reconnectDeadline) {
+            endCall(ctx.getString(R.string.err_lost))
+            return
+        }
+        // Only the caller drives recovery, so the two tablets never restart at the same time.
+        if (isCaller) {
+            if (conn == null) {
+                tryResume(id)
+            } else if (now - lastIceRestart >= ICE_RESTART_INTERVAL_MS) {
+                createOffer(iceRestart = true)
+            }
+        }
+        scheduleReconnectTick(id)
+    }
+
+    /** Caller side: open a new signalling socket to the callee and ask to continue the call. */
+    private fun tryResume(id: Int) {
+        if (resumeInFlight) return
+        resumeInFlight = true
+        val ip = prefs.peerIp.trim()
+        val port = prefs.port
+        timers.execute {
+            val s = try {
+                Socket().apply {
+                    connect(InetSocketAddress(ip, port), 2500)
+                    tcpNoDelay = true
+                    keepAlive = true
+                }
+            } catch (_: Exception) {
+                null
+            }
+            exec.execute {
+                resumeInFlight = false
+                if (s == null) return@execute
+                if (callId != id || state != CallState.RECONNECTING || conn != null) {
+                    try { s.close() } catch (_: Exception) {}
+                    return@execute
+                }
+                Log.i(TAG, "signalling socket re-opened, resuming")
+                val c = newConn(s)
+                conn = c
+                c.start()
+                c.send(msg("resume").put("name", prefs.myName).put("sid", sessionId))
+            }
+        }
+    }
+
+    /** Callee side: the caller re-opened the signalling socket after a network hiccup. */
+    private fun onResumeRequest(c: Conn, sid: String) {
+        val active = state == CallState.IN_CALL || state == CallState.RECONNECTING
+        if (active && !isCaller && sid.isNotEmpty() && sid == sessionId) {
+            Log.i(TAG, "caller resumed the call")
+            val old = conn
+            conn = c
+            old?.close()
+            c.send(msg("resumed"))
+            if (state == CallState.RECONNECTING && iceConnected()) setState(CallState.IN_CALL)
+        } else {
+            c.send(msg("gone"))
+            c.close()
+        }
+    }
+
+    private fun iceConnected() = iceState == PeerConnection.IceConnectionState.CONNECTED ||
+        iceState == PeerConnection.IceConnectionState.COMPLETED
+
+    // ---------------------------------------------------------------- bell
+
+    private fun onBellReceived(from: String) {
+        if (state != CallState.IDLE) return // already talking
+        Log.i(TAG, "bell from $from")
+        lastBell = from to System.currentTimeMillis()
+        setPeer(true) // they just reached us, so they're online
+        playBell()
+        main.post {
+            onWakeUp?.invoke()
+            listener?.onBell(from)
+        }
+    }
+
+    private fun playBell() {
+        try {
+            val afd = ctx.resources.openRawResourceFd(R.raw.bell)
+            val mp = MediaPlayer()
+            mp.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            afd.close()
+            val v = prefs.bellVolume.coerceIn(0, 100) / 100f
+            mp.setVolume(v, v)
+            mp.setOnCompletionListener { it.release() }
+            mp.prepare()
+            mp.start()
+        } catch (e: Exception) {
+            Log.w(TAG, "bell sound failed", e)
+        }
     }
 
     private fun armTimeout(id: Int) {
@@ -364,6 +567,8 @@ object CallManager {
             // Same LAN: no STUN/TURN servers needed, host candidates are enough.
             val cfg = PeerConnection.RTCConfiguration(emptyList()).apply {
                 sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+                // Keep gathering candidates so a reconnected Wi-Fi is picked up.
+                continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
             }
             val p = f.createPeerConnection(cfg, PcObserver(id)) ?: error("createPeerConnection failed")
             pc = p
@@ -399,16 +604,19 @@ object CallManager {
         iceState = null
     }
 
-    private fun createOffer() {
+    private fun createOffer(iceRestart: Boolean = false) {
         val p = pc ?: return
         val id = callId
+        if (iceRestart) lastIceRestart = System.currentTimeMillis()
+        val constraints = MediaConstraints()
+        if (iceRestart) constraints.mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
         p.createOffer(object : SdpAdapter() {
             override fun onCreateSuccess(sdp: SessionDescription) = exec.execute {
                 if (id != callId) return@execute
                 p.setLocalDescription(SdpAdapter(), sdp)
                 conn?.send(msg("offer").put("sdp", sdp.description))
             }
-        }, MediaConstraints())
+        }, constraints)
     }
 
     private fun createAnswer() {
@@ -438,35 +646,52 @@ object CallManager {
 
     private fun onIce(s: PeerConnection.IceConnectionState) {
         iceState = s
+        Log.i(TAG, "ICE $s (state=$state)")
         when (s) {
             PeerConnection.IceConnectionState.CONNECTED,
-            PeerConnection.IceConnectionState.COMPLETED -> if (state == CallState.CONNECTING) {
-                setState(CallState.IN_CALL)
-                val minutes = prefs.maxCallMinutes
-                if (minutes > 0) {
-                    val id = callId
-                    timers.schedule({
-                        exec.execute {
-                            if (callId == id && state == CallState.IN_CALL) {
-                                endCall(ctx.getString(R.string.auto_ended, minutes))
-                            }
-                        }
-                    }, minutes.toLong(), TimeUnit.MINUTES)
+            PeerConnection.IceConnectionState.COMPLETED -> when (state) {
+                CallState.CONNECTING -> {
+                    setState(CallState.IN_CALL)
+                    armMaxDuration()
                 }
+                CallState.RECONNECTING -> {
+                    Log.i(TAG, "reconnected")
+                    setState(CallState.IN_CALL)
+                }
+                else -> {}
             }
-            PeerConnection.IceConnectionState.FAILED -> endCall(ctx.getString(R.string.err_lost))
-            PeerConnection.IceConnectionState.DISCONNECTED -> {
+            PeerConnection.IceConnectionState.FAILED -> when (state) {
+                CallState.IN_CALL -> startReconnecting()
+                CallState.RECONNECTING -> {} // the reconnect tick will try an ICE restart
+                else -> endCall(ctx.getString(R.string.err_lost))
+            }
+            PeerConnection.IceConnectionState.DISCONNECTED -> if (state == CallState.IN_CALL) {
+                // Often recovers by itself within a second or two; only then show "Reconnecting".
                 val id = callId
                 timers.schedule({
                     exec.execute {
-                        if (callId == id && iceState == PeerConnection.IceConnectionState.DISCONNECTED) {
-                            endCall(ctx.getString(R.string.err_lost))
-                        }
+                        if (callId == id && state == CallState.IN_CALL &&
+                            (iceState == PeerConnection.IceConnectionState.DISCONNECTED ||
+                                iceState == PeerConnection.IceConnectionState.FAILED)
+                        ) startReconnecting()
                     }
-                }, 6, TimeUnit.SECONDS)
+                }, 2, TimeUnit.SECONDS)
             }
             else -> {}
         }
+    }
+
+    private fun armMaxDuration() {
+        val minutes = prefs.maxCallMinutes
+        if (minutes <= 0) return
+        val id = callId
+        timers.schedule({
+            exec.execute {
+                if (callId == id && state != CallState.IDLE) {
+                    endCall(ctx.getString(R.string.auto_ended, minutes))
+                }
+            }
+        }, minutes.toLong(), TimeUnit.MINUTES)
     }
 
     private class PcObserver(val id: Int) : PeerConnection.Observer {

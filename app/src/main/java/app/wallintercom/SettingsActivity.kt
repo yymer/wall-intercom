@@ -65,6 +65,7 @@ class SettingsActivity : Activity() {
 
         heading(R.string.h_calls)
         intField(R.string.call_volume, prefs.callVolume, 0..100) { prefs.callVolume = it }
+        intField(R.string.bell_volume, prefs.bellVolume, 0..100) { prefs.bellVolume = it }
         intField(R.string.max_minutes, prefs.maxCallMinutes, 0..1440) {
             prefs.maxCallMinutes = it
         }

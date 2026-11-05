@@ -39,6 +39,7 @@ class Prefs(ctx: Context) {
     var callVolume: Int get() = int("callVolume", 80); set(v) = put("callVolume", v)
     var maxCallMinutes: Int get() = int("maxCallMinutes", 15); set(v) = put("maxCallMinutes", v)
     var hdVideo: Boolean get() = bool("hdVideo", false); set(v) = put("hdVideo", v)
+    var bellVolume: Int get() = int("bellVolume", 80); set(v) = put("bellVolume", v)
     var hwEcho: Boolean get() = bool("hwEcho", false); set(v) = put("hwEcho", v)
 
     fun isNight(hour: Int): Boolean {
