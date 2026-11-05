@@ -20,6 +20,7 @@ import android.os.PowerManager
 class IntercomService : Service() {
     private var cpuLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -59,6 +60,10 @@ class IntercomService : Service() {
         wifiLock = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager)
             .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "wallintercom:wifi")
             .apply { setReferenceCounted(false); acquire() }
+        // Many Wi-Fi drivers drop broadcasts (tablet discovery) unless someone asks for them.
+        multicastLock = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager)
+            .createMulticastLock("wallintercom:discovery")
+            .apply { setReferenceCounted(false); acquire() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
@@ -66,6 +71,7 @@ class IntercomService : Service() {
     override fun onDestroy() {
         cpuLock?.release()
         wifiLock?.release()
+        multicastLock?.release()
         super.onDestroy()
     }
 

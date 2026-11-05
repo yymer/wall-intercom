@@ -59,17 +59,20 @@ class ProxyVideoSink : VideoSink {
 }
 
 /**
- * Peer-to-peer intercom between two tablets.
+ * Peer-to-peer intercom between paired tablets.
  *
- * Signalling: each tablet listens on a TCP port. The caller connects to the other tablet's IP
- * and the two exchange one-line JSON messages:
- *   caller -> hello{name,sid}    callee -> ok{name} (answered) | busy
- *                                callee -> ringing, then later ok{name} | decline | noanswer
- *   caller -> offer{sdp}         callee -> answer{sdp}
- *   both   -> ice{mid,idx,sdp}   either -> bye
- *   caller -> resume{name,sid}   callee -> resumed | gone   (new socket after the old one died)
- *   ping{name} -> pong{name}     (separate short connection, for the "online" indicator)
- *   bell{name} -> bellok         (separate short connection, rings the bell on the other tablet)
+ * Each tablet listens on a TCP port (calls) and the same UDP port ([Discovery]). Every TCP
+ * connection from a paired tablet starts with a mutual proof of the pair key and then carries
+ * signed one-line JSON messages (see [Link] and [Session]):
+ *   caller -> hello{sid}          callee -> ok (answered) | busy
+ *                                 callee -> ringing, then later ok | decline | noanswer
+ *   caller -> offer{sdp}          callee -> answer{sdp}
+ *   both   -> ice{mid,idx,sdp}    either -> bye
+ *   caller -> resume{sid}         callee -> resumed | gone   (new socket after the old one died)
+ *   ping -> pong{name}            (short connection, for the "online" dots)
+ *   bell -> bellok                (short connection, rings the bell on the other tablet)
+ *   unpair -> (closed)            (the other tablet removed us)
+ * An unpaired tablet may only send pair{…} (see [Link.pair]); someone here must press Accept.
  *
  * If the network hiccups during a call (ICE disconnected/failed or the signalling socket dies),
  * the call goes to RECONNECTING for up to [RECONNECT_GRACE_MS]. The caller re-opens the
@@ -88,14 +91,26 @@ object CallManager {
     private const val RING_REPEAT_MS = 4_000L
     /** A bit longer than the bell sound (2.6 s). */
     private const val BELL_FALLBACK_MS = 4_000L
+    /** How long a pairing request waits for Accept here. */
+    private const val PAIR_TIMEOUT_MS = 60_000L
 
     interface Listener {
         fun onCallState(state: CallState, peer: String, info: String?)
-        fun onPeerStatus(online: Boolean, peer: String)
+        /** Paired/found tablets or their online status changed: see [rooms]. */
+        fun onRoomsChanged()
         fun onBell(from: String)
         /** Our outgoing call was declined or not answered; shown next to the Call button. */
         fun onCallNotAnswered(info: String)
+        /** Another tablet asks to pair: show [code], then call [answerPairing]. */
+        fun onPairRequest(name: String, code: String)
+        /** The pairing request was answered, cancelled or timed out: hide it. */
+        fun onPairRequestEnded()
     }
+
+    /** One row on the main screen: a paired tablet, or a new one found on the network. */
+    data class Room(val id: String, val name: String, val paired: Boolean, val online: Boolean, val ip: String, val port: Int)
+
+    private class PendingPair(val c: Conn, val id: String, val name: String, val port: Int, val key: ByteArray, val code: String)
 
     private lateinit var ctx: Context
     private lateinit var prefs: Prefs
@@ -109,7 +124,7 @@ object CallManager {
 
     /** Set/cleared by the visible activity, main thread only. */
     var listener: Listener? = null
-    /** Called on the main thread on an incoming call or bell (wake screen + show activity). */
+    /** Called on the main thread on an incoming call, bell or pairing request (wake + show). */
     var onWakeUp: (() -> Unit)? = null
 
     /** Last bell received: (from, time). The activity shows it when it comes to the front. */
@@ -120,9 +135,19 @@ object CallManager {
     @Volatile
     var state = CallState.IDLE
         private set
+    /** Name of the tablet we're in a call with (or calling / being called by). */
     @Volatile
-    var peerOnline = false
+    var callPeerName = ""
         private set
+    private var callPeer: Peer? = null
+
+    /** Paired tablets that answered the last ping. */
+    private val online = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    /** A pairing request waiting for Accept here: (name, code), for the activity on resume. */
+    @Volatile
+    var pairRequest: Pair<String, String>? = null
+        private set
+    private var pendingPair: PendingPair? = null
 
     val localSink = ProxyVideoSink()
     val remoteSink = ProxyVideoSink()
@@ -159,43 +184,66 @@ object CallManager {
         initialized = true
         ctx = context.applicationContext
         prefs = Prefs(ctx)
+        Peers.init(ctx)
         eglBase = EglBase.create()
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(ctx).createInitializationOptions()
         )
         thread(name = "intercom-listener", isDaemon = true) { listenLoop() }
-        timers.scheduleWithFixedDelay({ pingPeer() }, 1, 20, TimeUnit.SECONDS)
+        Discovery.onChange = { roomsChanged() }
+        Discovery.start(prefs)
+        timers.scheduleWithFixedDelay({ pingAll() }, 3, 20, TimeUnit.SECONDS)
     }
 
     // ---------------------------------------------------------------- public API
 
-    fun dial() = exec.execute {
+    /** Paired tablets first (in pairing order), then new ones found on the network. */
+    fun rooms(): List<Room> {
+        val peers = Peers.all()
+        val found = Discovery.found()
+        val paired = peers.map { p ->
+            Room(p.id, p.name, true, online[p.id] == true, p.ip ?: "", p.port)
+        }
+        val new = found.filter { f -> peers.none { it.id == f.id } }
+            .sortedBy { it.name }
+            .map { Room(it.id, it.name.ifBlank { it.ip }, false, true, it.ip, it.port) }
+        return paired + new
+    }
+
+    fun dial(peerId: String) = exec.execute {
         if (state != CallState.IDLE) return@execute
-        val ip = prefs.peerIp.trim()
-        if (ip.isEmpty()) {
-            notifyInfo(ctx.getString(R.string.err_no_ip))
-            return@execute
-        }
+        val peer = Peers.get(peerId) ?: return@execute
         val id = ++callId
+        callPeer = peer
+        callPeerName = peer.name
         setState(CallState.DIALING)
-        val socket = try {
-            Socket().apply {
-                connect(InetSocketAddress(ip, prefs.port), 4000)
-                tcpNoDelay = true
-                keepAlive = true
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "connect failed", e)
-            setState(CallState.IDLE, ctx.getString(R.string.err_unreachable, prefs.peerName))
-            setPeer(false)
+        val r = Link.open(prefs, peer, 4000) // blocks this thread for a moment, like before
+        if (callId != id || state != CallState.DIALING) {
+            (r as? Link.Result.Ok)?.link?.close()
             return@execute
         }
-        val c = newConn(socket)
+        val link = when (r) {
+            is Link.Result.Ok -> r.link
+            Link.Result.Forgotten -> {
+                forgotten(peer)
+                setState(CallState.IDLE, ctx.getString(R.string.err_forgotten, peer.name))
+                return@execute
+            }
+            Link.Result.Unreachable -> {
+                setOnline(peer.id, false)
+                setState(CallState.IDLE, ctx.getString(R.string.err_unreachable, peer.name))
+                return@execute
+            }
+        }
+        setOnline(peer.id, true)
+        val c = newConn(link.socket, link.reader)
+        c.session = link.session
+        c.peerId = peer.id
         conn = c
         isCaller = true
         sessionId = UUID.randomUUID().toString()
         c.start()
-        c.send(msg("hello").put("name", prefs.myName).put("sid", sessionId))
+        c.send(msg("hello").put("sid", sessionId))
         armTimeout(id, CONNECT_TIMEOUT_MS)
     }
 
@@ -219,43 +267,72 @@ object CallManager {
         startAnswered(c)
     }
 
-    fun pingNow() = timers.execute { pingPeer() }
+    /** Check now which rooms are online, and look for new tablets. */
+    fun pingNow() {
+        Discovery.search()
+        timers.execute { pingAll() }
+    }
 
     /**
-     * Rings the bell on the other tablet. [onDone] is called on the main thread with whether the
-     * other tablet received it; failures are also shown as an info message.
+     * Rings the bell on [peerId]. [onDone] is called on the main thread with whether the other
+     * tablet received it; failures are also shown as an info message.
      */
-    fun sendBell(onDone: (Boolean) -> Unit) = timers.execute {
-        val ip = prefs.peerIp.trim()
-        if (ip.isEmpty()) {
-            notifyInfo(ctx.getString(R.string.err_no_ip))
+    fun sendBell(peerId: String, onDone: (Boolean) -> Unit) = timers.execute {
+        val peer = Peers.get(peerId)
+        if (peer == null) {
             main.post { onDone(false) }
             return@execute
         }
-        val ok = try {
-            Socket().use { s ->
-                s.connect(InetSocketAddress(ip, prefs.port), 3000)
-                s.soTimeout = 3000
-                val out = s.getOutputStream()
-                out.write((msg("bell").put("name", prefs.myName).toString() + "\n").toByteArray())
-                out.flush()
-                JSONObject(s.getInputStream().bufferedReader().readLine() ?: "{}").optString("t") == "bellok"
+        val (r, reply) = Link.request(prefs, peer, msg("bell"))
+        val ok = reply?.optString("t") == "bellok"
+        when {
+            r is Link.Result.Forgotten -> {
+                forgotten(peer)
+                notifyInfo(ctx.getString(R.string.err_forgotten, peer.name))
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "bell failed: ${e.message}")
-            false
+            !ok -> notifyInfo(ctx.getString(R.string.err_unreachable, peer.name))
         }
-        setPeer(ok)
-        if (!ok) notifyInfo(ctx.getString(R.string.err_unreachable, prefs.peerName))
+        setOnline(peer.id, ok)
         main.post { onDone(ok) }
     }
 
-    /** Re-bind the listening socket (e.g. after the port changed). */
+    /** Removes a paired tablet here, and tells it to forget us too (if it's reachable). */
+    fun unpair(peerId: String) {
+        val peer = Peers.get(peerId) ?: return
+        Log.i(TAG, "removing ${peer.name}")
+        Peers.remove(peerId)
+        online.remove(peerId)
+        roomsChanged()
+        // Uses the copy: it still has the key needed to prove it's us.
+        timers.execute { Link.request(prefs, peer, msg("unpair"), 2000) }
+    }
+
+    /** Accept or decline the pairing request shown by [Listener.onPairRequest]. */
+    fun answerPairing(accept: Boolean) = exec.execute {
+        val p = pendingPair ?: return@execute
+        pendingPair = null
+        pairRequest = null
+        if (accept) {
+            val ip = p.c.remoteAddress?.hostAddress
+            Peers.put(Peer(p.id, p.name, p.key, ip, p.port))
+            Log.i(TAG, "paired with ${p.name}")
+            p.c.send(msg("pairok"))
+            setOnline(p.id, true)
+        } else {
+            p.c.send(msg("pairno").put("why", "declined"))
+        }
+        p.c.close()
+        roomsChanged()
+        main.post { listener?.onPairRequestEnded() }
+    }
+
+    /** Re-bind the listening sockets (e.g. after the port changed). */
     fun restartListener() {
         try {
             serverSocket?.close()
         } catch (_: Exception) {
         }
+        Discovery.restart()
     }
 
     // ---------------------------------------------------------------- networking
@@ -283,45 +360,50 @@ object CallManager {
         }
     }
 
-    private fun newConn(s: Socket) = Conn(
+    private fun newConn(s: Socket, reader: java.io.BufferedReader? = null) = Conn(
         s,
         onMessage = { c, m -> exec.execute { onMessage(c, m) } },
         onClosed = { c -> exec.execute { onClosed(c) } },
+        reader = reader,
     )
 
-    private fun pingPeer() {
-        val ip = prefs.peerIp.trim()
-        if (ip.isEmpty()) {
-            setPeer(false); return
-        }
-        if (state != CallState.IDLE) {
-            setPeer(true); return
-        }
-        val ok = try {
-            Socket().use { s ->
-                s.connect(InetSocketAddress(ip, prefs.port), 2000)
-                s.soTimeout = 3000
-                val out = s.getOutputStream()
-                out.write((msg("ping").put("name", prefs.myName).toString() + "\n").toByteArray())
-                out.flush()
-                val line = s.getInputStream().bufferedReader().readLine() ?: "{}"
-                val m = JSONObject(line)
-                if (m.optString("t") == "pong") {
-                    m.optString("name").takeIf { it.isNotBlank() }?.let { prefs.peerName = it }
-                    true
-                } else false
+    private fun pingAll() {
+        for (peer in Peers.all()) {
+            if (state != CallState.IDLE && callPeer?.id == peer.id) {
+                setOnline(peer.id, true)
+                continue
             }
-        } catch (_: Exception) {
-            false
+            val (r, reply) = Link.request(prefs, peer, msg("ping"))
+            if (r is Link.Result.Forgotten) {
+                forgotten(peer)
+                continue
+            }
+            val ok = reply?.optString("t") == "pong"
+            if (ok) reply!!.optString("name").let { Peers.updateName(peer.id, it) }
+            setOnline(peer.id, ok)
         }
-        setPeer(ok)
     }
 
-    private fun onMessage(c: Conn, m: JSONObject) {
-        // Only ever talk to the configured other tablet.
-        if (!isFromPeer(c)) {
-            Log.w(TAG, "ignoring connection from ${c.remoteAddress?.hostAddress} (not the other tablet)")
-            c.close()
+    /** The other tablet doesn't know us anymore (reset or removed us): drop it here too. */
+    private fun forgotten(peer: Peer) {
+        Log.i(TAG, "${peer.name} doesn't know this tablet anymore, removing it")
+        Peers.remove(peer.id)
+        online.remove(peer.id)
+        roomsChanged()
+    }
+
+    private fun onMessage(c: Conn, raw: JSONObject) {
+        val session = c.session
+        val m = if (session != null) {
+            session.unwrap(raw) ?: run {
+                Log.w(TAG, "dropping connection: bad signature from ${c.remoteAddress?.hostAddress}")
+                c.close()
+                return
+            }
+        } else raw
+        val peer = Peers.get(c.peerId)
+        if (peer == null) {
+            onUnauthenticated(c, m)
             return
         }
         when (m.optString("t")) {
@@ -332,40 +414,125 @@ object CallManager {
             "bell" -> {
                 c.send(msg("bellok"))
                 c.close()
-                onBellReceived(m.optString("name").ifBlank { prefs.peerName })
+                onBellReceived(peer)
             }
-            "hello" -> onHello(c, m.optString("name"), m.optString("sid"))
-            "resume" -> onResumeRequest(c, m.optString("sid"))
+            "unpair" -> {
+                Log.i(TAG, "${peer.name} removed this tablet")
+                c.close()
+                Peers.remove(peer.id)
+                online.remove(peer.id)
+                roomsChanged()
+            }
+            "hello" -> onHello(c, peer, m.optString("sid"))
+            "resume" -> onResumeRequest(c, peer, m.optString("sid"))
             else -> if (c === conn) onCallMessage(m)
         }
     }
 
-    private fun isFromPeer(c: Conn): Boolean {
-        val ip = prefs.peerIp.trim()
-        if (ip.isEmpty()) return false
-        return try {
-            c.remoteAddress != null && c.remoteAddress == java.net.InetAddress.getByName(ip)
-        } catch (_: Exception) {
-            false
+    /** Server side, before the other end proved who it is: only auth/proof and pairing. */
+    private fun onUnauthenticated(c: Conn, m: JSONObject) {
+        when (m.optString("t")) {
+            "auth" -> {
+                val p = Peers.get(m.optString("id"))
+                if (p == null) {
+                    c.send(msg("unknown"))
+                    c.close()
+                    return
+                }
+                val nc = m.optString("n")
+                val ns = Crypto.nonce()
+                c.pendingAuth = Triple(p.id, nc, ns)
+                c.send(msg("chal").put("id", prefs.deviceId).put("n", ns).put("h", Crypto.hmacB64(p.key, "server", nc, ns)))
+            }
+            "proof" -> {
+                val (id, nc, ns) = c.pendingAuth ?: return c.close()
+                val p = Peers.get(id) ?: return c.close()
+                if (!Crypto.same(m.optString("h"), Crypto.hmacB64(p.key, "client", nc, ns))) {
+                    Log.w(TAG, "wrong proof from ${c.remoteAddress?.hostAddress} claiming to be ${p.name}")
+                    c.close()
+                    return
+                }
+                c.pendingAuth = null
+                c.session = Session(p.key, nc, ns, isClient = false)
+                c.peerId = p.id
+                c.remoteAddress?.hostAddress?.let { Peers.updateAddress(p.id, it) }
+                setOnline(p.id, true)
+            }
+            "pair" -> onPairRequest(c, m)
+            else -> {
+                Log.w(TAG, "ignoring unauthenticated '${m.optString("t")}' from ${c.remoteAddress?.hostAddress}")
+                c.close()
+            }
         }
     }
 
-    private fun onHello(c: Conn, from: String, sid: String) {
+    // ---------------------------------------------------------------- pairing (this side)
+
+    private fun onPairRequest(c: Conn, m: JSONObject) {
+        val id = m.optString("id")
+        val name = m.optString("name").take(60).ifBlank { c.remoteAddress?.hostAddress ?: "?" }
+        val pub = m.optString("pub")
         when {
-            state == CallState.IDLE -> if (prefs.autoAnswer) autoAnswer(c, from, sid) else ring(c, from, sid)
-            // The other tablet gave up on a broken call and is calling again: start over.
-            state == CallState.RECONNECTING && from == prefs.peerName -> {
-                endCall(null, notifyPeer = false)
-                accept(c, from, sid)
+            id.isBlank() || pub.isBlank() || id == prefs.deviceId -> return c.close()
+            state != CallState.IDLE -> {
+                c.send(msg("pairno").put("why", "busy")); c.close(); return
             }
-            // Both pressed "call" at the same moment: the tablet whose name sorts first keeps
+            pendingPair != null -> {
+                c.send(msg("pairno").put("why", "pairing")); c.close(); return
+            }
+        }
+        val res = try {
+            val me = Crypto.Pairing()
+            val r = me.finish(prefs.deviceId, id, pub)
+            c.send(msg("pairwait").put("id", prefs.deviceId).put("name", prefs.myName).put("pub", me.publicKey))
+            r
+        } catch (e: Exception) {
+            Log.w(TAG, "bad pairing request", e)
+            c.close()
+            return
+        }
+        Log.i(TAG, "pairing request from $name, code ${res.code}")
+        val p = PendingPair(c, id, name, m.optInt("port", prefs.port), res.key, res.code)
+        pendingPair = p
+        pairRequest = name to res.code
+        playBell()
+        main.post {
+            onWakeUp?.invoke()
+            listener?.onPairRequest(name, res.code)
+        }
+        timers.schedule({
+            exec.execute {
+                if (pendingPair === p) {
+                    Log.i(TAG, "nobody answered the pairing request")
+                    pendingPair = null
+                    pairRequest = null
+                    p.c.send(msg("pairno").put("why", "timeout"))
+                    p.c.close()
+                    main.post { listener?.onPairRequestEnded() }
+                }
+            }
+        }, PAIR_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    }
+
+    // ---------------------------------------------------------------- calls
+
+    private fun onHello(c: Conn, peer: Peer, sid: String) {
+        val same = callPeer?.id == peer.id
+        when {
+            state == CallState.IDLE -> if (prefs.autoAnswer) autoAnswer(c, peer, sid) else ring(c, peer, sid)
+            // The other tablet gave up on a broken call and is calling again: start over.
+            state == CallState.RECONNECTING && same -> {
+                endCall(null, notifyPeer = false)
+                accept(c, peer, sid)
+            }
+            // Both pressed "call" at the same moment: the tablet whose id sorts first keeps
             // its outgoing call, the other one drops its own and accepts (no need to ring:
             // someone here just pressed Call).
-            state == CallState.DIALING && prefs.myName > from -> {
+            state == CallState.DIALING && same && prefs.deviceId > peer.id -> {
                 val old = conn
                 conn = null
                 old?.close()
-                accept(c, from, sid)
+                accept(c, peer, sid)
             }
             else -> {
                 c.send(msg("busy"))
@@ -374,17 +541,18 @@ object CallManager {
         }
     }
 
-    private fun takeIncoming(c: Conn, from: String, sid: String) {
+    private fun takeIncoming(c: Conn, peer: Peer, sid: String) {
         conn = c
         isCaller = false
         sessionId = sid
         ++callId
-        if (from.isNotBlank()) prefs.peerName = from
+        callPeer = peer
+        callPeerName = peer.name
     }
 
     /** Answer right away: both tablets called each other at the same moment. */
-    private fun accept(c: Conn, from: String, sid: String) {
-        takeIncoming(c, from, sid)
+    private fun accept(c: Conn, peer: Peer, sid: String) {
+        takeIncoming(c, peer, sid)
         main.post { onWakeUp?.invoke() }
         startAnswered(c)
     }
@@ -395,10 +563,10 @@ object CallManager {
      * finished: switching to call audio mid-bell cut the bell short, and an open microphone would
      * send the bell to the other tablet.
      */
-    private fun autoAnswer(c: Conn, from: String, sid: String) {
-        takeIncoming(c, from, sid)
+    private fun autoAnswer(c: Conn, peer: Peer, sid: String) {
+        takeIncoming(c, peer, sid)
         val id = callId
-        Log.i(TAG, "incoming call from ${prefs.peerName}, auto-answering after the bell")
+        Log.i(TAG, "incoming call from ${peer.name}, auto-answering after the bell")
         setState(CallState.AUTO_ANSWERING)
         c.send(msg("ringing"))
         main.post { onWakeUp?.invoke() }
@@ -414,10 +582,10 @@ object CallManager {
     }
 
     /** Ring here and wait for someone to press Answer or Decline. */
-    private fun ring(c: Conn, from: String, sid: String) {
-        takeIncoming(c, from, sid)
+    private fun ring(c: Conn, peer: Peer, sid: String) {
+        takeIncoming(c, peer, sid)
         val id = callId
-        Log.i(TAG, "incoming call from ${prefs.peerName}, ringing")
+        Log.i(TAG, "incoming call from ${peer.name}, ringing")
         setState(CallState.INCOMING)
         c.send(msg("ringing"))
         main.post { onWakeUp?.invoke() }
@@ -428,7 +596,7 @@ object CallManager {
                 if (callId == id && timeoutGen == gen && state == CallState.INCOMING) {
                     Log.i(TAG, "nobody answered")
                     conn?.send(msg("noanswer"))
-                    endCall(ctx.getString(R.string.missed_call, prefs.peerName), notifyPeer = false)
+                    endCall(ctx.getString(R.string.missed_call, callPeerName), notifyPeer = false)
                 }
             }
         }, RING_TIMEOUT_MS, TimeUnit.MILLISECONDS)
@@ -443,7 +611,7 @@ object CallManager {
     private fun startAnswered(c: Conn, chime: Boolean = true) {
         val id = callId
         setState(CallState.CONNECTING)
-        c.send(msg("ok").put("name", prefs.myName))
+        c.send(msg("ok"))
         if (chime) chime()
         if (!startMedia()) return
         armTimeout(id, CONNECT_TIMEOUT_MS)
@@ -460,12 +628,11 @@ object CallManager {
             "decline" -> endNotAnswered(R.string.err_declined, notifyPeer = false)
             "noanswer" -> endNotAnswered(R.string.err_no_answer, notifyPeer = false)
             "ok" -> if (state == CallState.DIALING || state == CallState.RINGING) {
-                m.optString("name").takeIf { it.isNotBlank() }?.let { prefs.peerName = it }
                 setState(CallState.CONNECTING)
                 armTimeout(callId, CONNECT_TIMEOUT_MS)
                 if (startMedia()) createOffer()
             }
-            "busy" -> endCall(ctx.getString(R.string.err_busy, prefs.peerName), notifyPeer = false)
+            "busy" -> endCall(ctx.getString(R.string.err_busy, callPeerName), notifyPeer = false)
             "offer" -> if (p != null) setRemote(p, SessionDescription.Type.OFFER, m.getString("sdp")) { createAnswer() }
             "answer" -> if (p != null) setRemote(p, SessionDescription.Type.ANSWER, m.getString("sdp")) {}
             "ice" -> {
@@ -490,6 +657,14 @@ object CallManager {
     }
 
     private fun onClosed(c: Conn) {
+        val p = pendingPair
+        if (p != null && c === p.c) {
+            // The other tablet cancelled its pairing request.
+            pendingPair = null
+            pairRequest = null
+            main.post { listener?.onPairRequestEnded() }
+            return
+        }
         if (c !== conn) return
         if (state == CallState.IN_CALL || state == CallState.RECONNECTING) {
             // Network hiccup: keep the call, try to get the signalling back.
@@ -503,7 +678,7 @@ object CallManager {
 
     /** If the caller gave up while it was still ringing here, tell the room they missed a call. */
     private fun missedCallInfo() =
-        if (state == CallState.INCOMING) ctx.getString(R.string.missed_call, prefs.peerName) else null
+        if (state == CallState.INCOMING) ctx.getString(R.string.missed_call, callPeerName) else null
 
     // ---------------------------------------------------------------- reconnecting
 
@@ -543,39 +718,32 @@ object CallManager {
     /** Caller side: open a new signalling socket to the callee and ask to continue the call. */
     private fun tryResume(id: Int) {
         if (resumeInFlight) return
+        val peer = callPeer?.let { Peers.get(it.id) ?: it } ?: return
         resumeInFlight = true
-        val ip = prefs.peerIp.trim()
-        val port = prefs.port
         timers.execute {
-            val s = try {
-                Socket().apply {
-                    connect(InetSocketAddress(ip, port), 2500)
-                    tcpNoDelay = true
-                    keepAlive = true
-                }
-            } catch (_: Exception) {
-                null
-            }
+            val r = Link.open(prefs, peer, 2500)
             exec.execute {
                 resumeInFlight = false
-                if (s == null) return@execute
+                val link = (r as? Link.Result.Ok)?.link ?: return@execute
                 if (callId != id || state != CallState.RECONNECTING || conn != null) {
-                    try { s.close() } catch (_: Exception) {}
+                    link.close()
                     return@execute
                 }
                 Log.i(TAG, "signalling socket re-opened, resuming")
-                val c = newConn(s)
+                val c = newConn(link.socket, link.reader)
+                c.session = link.session
+                c.peerId = peer.id
                 conn = c
                 c.start()
-                c.send(msg("resume").put("name", prefs.myName).put("sid", sessionId))
+                c.send(msg("resume").put("sid", sessionId))
             }
         }
     }
 
     /** Callee side: the caller re-opened the signalling socket after a network hiccup. */
-    private fun onResumeRequest(c: Conn, sid: String) {
+    private fun onResumeRequest(c: Conn, peer: Peer, sid: String) {
         val active = state == CallState.IN_CALL || state == CallState.RECONNECTING
-        if (active && !isCaller && sid.isNotEmpty() && sid == sessionId) {
+        if (active && !isCaller && callPeer?.id == peer.id && sid.isNotEmpty() && sid == sessionId) {
             Log.i(TAG, "caller resumed the call")
             val old = conn
             conn = c
@@ -593,11 +761,12 @@ object CallManager {
 
     // ---------------------------------------------------------------- bell
 
-    private fun onBellReceived(from: String) {
+    private fun onBellReceived(peer: Peer) {
         if (state != CallState.IDLE) return // already talking
+        val from = peer.name
         Log.i(TAG, "bell from $from")
         lastBell = from to System.currentTimeMillis()
-        setPeer(true) // they just reached us, so they're online
+        setOnline(peer.id, true) // they just reached us
         playBell()
         main.post {
             onWakeUp?.invoke()
@@ -647,14 +816,14 @@ object CallManager {
                     state == CallState.CONNECTING
                 if (callId == id && timeoutGen == gen && waiting) {
                     if (state == CallState.RINGING) endNotAnswered(R.string.err_no_answer, notifyPeer = true)
-                    else endCall(ctx.getString(R.string.err_timeout, prefs.peerName))
+                    else endCall(ctx.getString(R.string.err_timeout, callPeerName))
                 }
             }
         }, ms, TimeUnit.MILLISECONDS)
     }
 
     private fun endNotAnswered(infoRes: Int, notifyPeer: Boolean) {
-        val info = ctx.getString(infoRes, prefs.peerName)
+        val info = ctx.getString(infoRes, callPeerName)
         endCall(null, notifyPeer)
         main.post { listener?.onCallNotAnswered(info) }
     }
@@ -669,6 +838,7 @@ object CallManager {
         }
         teardownMedia()
         setState(CallState.IDLE, info)
+        callPeer = null
     }
 
     // ---------------------------------------------------------------- WebRTC
@@ -917,19 +1087,21 @@ object CallManager {
 
     private fun setState(s: CallState, info: String? = null) {
         state = s
-        val peer = prefs.peerName
+        val peer = callPeerName
         main.post { listener?.onCallState(s, peer, info) }
     }
 
     private fun notifyInfo(info: String) {
         val s = state
-        val peer = prefs.peerName
+        val peer = callPeerName
         main.post { listener?.onCallState(s, peer, info) }
     }
 
-    private fun setPeer(online: Boolean) {
-        peerOnline = online
-        val peer = prefs.peerName
-        main.post { listener?.onPeerStatus(online, peer) }
+    private fun setOnline(peerId: String, isOnline: Boolean) {
+        if (online.put(peerId, isOnline) != isOnline) roomsChanged()
+    }
+
+    private fun roomsChanged() {
+        main.post { listener?.onRoomsChanged() }
     }
 }

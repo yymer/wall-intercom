@@ -18,10 +18,12 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.DocumentsContract
 import android.util.Log
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.exifinterface.media.ExifInterface
 import org.webrtc.RendererCommon
@@ -39,9 +41,7 @@ class MainActivity : Activity(), CallManager.Listener {
     private lateinit var remoteView: SurfaceViewRenderer
     private lateinit var localView: SurfaceViewRenderer
     private lateinit var overlay: View
-    private lateinit var callBtn: Button
-    private lateinit var bellBtn: Button
-    private lateinit var peerStatus: TextView
+    private lateinit var roomsList: LinearLayout
     private lateinit var callResult: TextView
     private lateinit var callPanel: View
     private lateinit var callStatus: TextView
@@ -84,9 +84,7 @@ class MainActivity : Activity(), CallManager.Listener {
         remoteView = findViewById(R.id.remoteView)
         localView = findViewById(R.id.localView)
         overlay = findViewById(R.id.overlay)
-        callBtn = findViewById(R.id.callBtn)
-        bellBtn = findViewById(R.id.bellBtn)
-        peerStatus = findViewById(R.id.peerStatus)
+        roomsList = findViewById(R.id.roomsList)
         callResult = findViewById(R.id.callResult)
         callPanel = findViewById(R.id.callPanel)
         callStatus = findViewById(R.id.callStatus)
@@ -107,19 +105,6 @@ class MainActivity : Activity(), CallManager.Listener {
 
         findViewById<View>(R.id.root).setOnClickListener { onScreenTouched() }
         overlay.setOnClickListener { hideOverlay() }
-        callBtn.setOnClickListener {
-            hideOverlay()
-            CallManager.dial()
-        }
-        bellBtn.setOnClickListener {
-            // Buttons stay up; the bell button shows it's ringing until the bell has played.
-            setBellRinging(true)
-            showOverlay() // restart the auto-hide timer
-            CallManager.sendBell { ok ->
-                if (ok) handler.postDelayed({ setBellRinging(false) }, BELL_SOUND_MS)
-                else setBellRinging(false)
-            }
-        }
         answerBtn.setOnClickListener { CallManager.answer() }
         endBtn.setOnClickListener { CallManager.hangup() } // declines while ringing
         val settingsBtn = findViewById<View>(R.id.settingsBtn)
@@ -147,8 +132,10 @@ class MainActivity : Activity(), CallManager.Listener {
         hideSystemUi()
         lockTaskIfDeviceOwner()
         CallManager.listener = this
-        onCallState(CallManager.state, prefs.peerName, null)
-        updateCallButton()
+        onCallState(CallManager.state, CallManager.callPeerName, null)
+        rebuildRooms()
+        // A pairing request that arrived while we were in the background.
+        CallManager.pairRequest?.let { (name, code) -> if (pairDialog == null) onPairRequest(name, code) }
         // A bell that arrived while we were in the background (or the screen was off).
         CallManager.lastBell?.let { (from, at) ->
             if (at > bellShownAt && System.currentTimeMillis() - at < 60_000) onBell(from)
@@ -225,7 +212,41 @@ class MainActivity : Activity(), CallManager.Listener {
         }
     }
 
-    override fun onPeerStatus(online: Boolean, peer: String) = updateCallButton()
+    override fun onRoomsChanged() {
+        if (overlay.visibility == View.VISIBLE) rebuildRooms()
+    }
+
+    // ---------------------------------------------------------------- pairing
+
+    private var pairDialog: android.app.AlertDialog? = null
+
+    override fun onPairRequest(name: String, code: String) {
+        pairDialog?.dismiss()
+        hideOverlay()
+        setBrightness(true)
+        pairDialog = PairingDialogs.request(this, name, code) { accept ->
+            pairDialog = null
+            CallManager.answerPairing(accept)
+            if (accept) showOverlay() // shows the new room
+        }
+    }
+
+    override fun onPairRequestEnded() {
+        pairDialog?.dismiss()
+        pairDialog = null
+        if (overlay.visibility != View.VISIBLE && CallManager.state == CallState.IDLE) setBrightness(false)
+    }
+
+    /** A new (unpaired) room was pressed: pair first, then do what was asked. */
+    private fun pairThen(room: CallManager.Room, then: (Peer) -> Unit) {
+        handler.removeCallbacks(hideOverlayRunnable) // stay up while the dialogs are open
+        PairingDialogs.pair(this, room.ip, room.port, room.name, onPaired = { peer ->
+            rebuildRooms()
+            then(peer)
+        }, onFinished = {
+            if (overlay.visibility == View.VISIBLE) showOverlay() // restart the auto-hide timer
+        })
+    }
 
     private var bellShownAt = 0L
 
@@ -245,30 +266,123 @@ class MainActivity : Activity(), CallManager.Listener {
         callResult.visibility = View.VISIBLE
     }
 
-    private fun updateCallButton() {
-        callBtn.setText(R.string.call_button)
-        bellBtn.setText(R.string.bell_button)
-        if (CallManager.peerOnline) {
-            peerStatus.setText(R.string.status_online)
-            peerStatus.setTextColor(Color.parseColor("#7CE38B"))
-        } else {
-            peerStatus.setText(R.string.status_offline)
-            peerStatus.setTextColor(Color.parseColor("#BBBBBB"))
+    // ---------------------------------------------------------------- rooms
+
+    /** Rooms whose bell button is showing "ringing". */
+    private val ringingBells = HashSet<String>()
+    private val bellButtons = HashMap<String, Button>()
+
+    /** One row per room: name with an online dot, Call, Bell. New rooms pair first. */
+    private fun rebuildRooms() {
+        roomsList.removeAllViews()
+        bellButtons.clear()
+        val rooms = CallManager.rooms()
+        if (rooms.isEmpty()) {
+            roomsList.addView(TextView(this).apply {
+                setText(R.string.rooms_searching)
+                gravity = Gravity.CENTER
+                textSize = 20f
+                setTextColor(Color.WHITE)
+                setShadowLayer(8f, 0f, 0f, Color.BLACK)
+            })
+            return
+        }
+        for (room in rooms) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(6), 0, dp(6))
+            }
+            val dotColor = if (room.online) Color.parseColor("#7CE38B") else Color.parseColor("#BBBBBB")
+            val label = android.text.SpannableStringBuilder()
+            label.append("● ", android.text.style.ForegroundColorSpan(dotColor), 0)
+            label.append(room.name)
+            if (!room.paired) {
+                label.append(
+                    "  " + getString(R.string.room_new),
+                    android.text.style.RelativeSizeSpan(0.7f), 0,
+                )
+            }
+            row.addView(TextView(this).apply {
+                text = label
+                textSize = 22f
+                setTextColor(Color.WHITE)
+                setShadowLayer(8f, 0f, 0f, Color.BLACK)
+                minWidth = dp(200)
+                setPadding(0, 0, dp(20), 0)
+            })
+            val call = roundButton(R.drawable.bg_call, R.drawable.ic_stat, R.string.call_button)
+            call.setOnClickListener {
+                if (room.paired) {
+                    hideOverlay()
+                    CallManager.dial(room.id)
+                } else {
+                    pairThen(room) { peer ->
+                        hideOverlay()
+                        CallManager.dial(peer.id)
+                    }
+                }
+            }
+            row.addView(call)
+            val bell = roundButton(
+                if (room.id in ringingBells) R.drawable.bg_bell_ringing else R.drawable.bg_bell,
+                R.drawable.ic_bell, R.string.bell_button,
+            )
+            bell.isEnabled = room.id !in ringingBells
+            bell.setOnClickListener {
+                if (room.paired) ringBell(room.id) else pairThen(room) { peer -> ringBell(peer.id) }
+            }
+            row.addView(bell, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { marginStart = dp(16) })
+            bellButtons[room.id] = bell
+            roomsList.addView(row)
         }
     }
+
+    private fun ringBell(peerId: String) {
+        // Buttons stay up; the bell button shows it's ringing until the bell has played.
+        setBellRinging(peerId, true)
+        showOverlay() // restart the auto-hide timer
+        CallManager.sendBell(peerId) { ok ->
+            if (ok) handler.postDelayed({ setBellRinging(peerId, false) }, BELL_SOUND_MS)
+            else setBellRinging(peerId, false)
+        }
+    }
+
+    private fun roundButton(bg: Int, icon: Int, text: Int) = Button(this).apply {
+        setBackgroundResource(bg)
+        setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
+        compoundDrawablePadding = dp(12)
+        minWidth = 0
+        minHeight = 0
+        minimumWidth = 0
+        minimumHeight = 0
+        setPaddingRelative(dp(28), dp(12), dp(32), dp(12))
+        stateListAnimator = null
+        isAllCaps = false
+        setTextColor(Color.WHITE)
+        textSize = 20f
+        setText(text)
+    }
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     private fun onScreenTouched() {
         if (CallManager.state != CallState.IDLE) return
         if (overlay.visibility == View.VISIBLE) hideOverlay() else showOverlay()
     }
 
-    private fun setBellRinging(ringing: Boolean) {
-        bellBtn.isEnabled = !ringing
-        bellBtn.setBackgroundResource(if (ringing) R.drawable.bg_bell_ringing else R.drawable.bg_bell)
+    private fun setBellRinging(peerId: String, ringing: Boolean) {
+        if (ringing) ringingBells += peerId else ringingBells -= peerId
+        bellButtons[peerId]?.let {
+            it.isEnabled = !ringing
+            it.setBackgroundResource(if (ringing) R.drawable.bg_bell_ringing else R.drawable.bg_bell)
+        }
     }
 
     private fun showOverlay() {
-        updateCallButton()
+        rebuildRooms()
         overlay.visibility = View.VISIBLE
         hint.alpha = 0f // don't let the "no photos" hint show through the overlay
         setBrightness(true)

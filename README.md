@@ -1,12 +1,16 @@
 # Wall Intercom
 
-Turn two old Android tablets into wall-mounted **photo frames that double as a video intercom**
-between two rooms. No server, no cloud, no accounts: the tablets talk directly to each other
-over your home Wi-Fi.
+Turn old Android tablets into wall-mounted **photo frames that double as a video intercom**
+between rooms. No server, no cloud, no accounts: the tablets find each other on your home Wi-Fi
+and talk directly to each other.
 
 - Full-screen, cross-fading **slideshow** from a photo album on the tablet. To add photos,
   select them in Photos (or any app) → **Share → Wall Intercom**.
-- Touch the screen and two small buttons appear: **Call** and **Bell**. They stay for 25 s.
+- Touch the screen and each room appears with an online dot and two buttons, **Call** and
+  **Bell**. They stay for 25 s.
+- **Pairing is one tap**: other tablets on the Wi-Fi show up by themselves, marked *new*.
+  Pressing Call or Bell on a new room asks to pair; the other tablet shows the same 4-digit code
+  and someone there presses **Accept**. Pairings survive IP and network changes.
 - **Call** rings the other tablet: it wakes up and shows **Answer** / **Decline**. The camera
   and microphone stay off until someone there presses **Answer** (then a short chime plays
   so the room knows the camera is on). Unanswered calls stop after 45 s and show
@@ -61,8 +65,7 @@ will refuse to install them over the old version.
    **Wall Intercom**. They're copied into the album *Wall Intercom* (`Pictures/Wall Intercom`),
    which the slideshow then shows. Sharing the same photo twice doesn't copy it again.
 3. Open **Wall Intercom**. Tap the screen, then **press and hold ⚙** (top right) for settings:
-   - *Name of this room*, e.g. `Kitchen`. The two tablets must have different names.
-   - *Other tablet's IP address*: shown at the top of the other tablet's settings.
+   - *Name of this room*, e.g. `Kitchen`.
    - Optional: *Choose album…* to show a different album on the tablet instead (e.g. Camera),
      or *Other folder…* for any folder, e.g. on an SD card.
    - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*
@@ -72,7 +75,11 @@ will refuse to install them over the old version.
    screen, so it comes back by itself after a reboot or if someone leaves it.
 5. Android settings → *Security → Screen lock* → **None**, so calls aren't stuck behind the
    lock screen.
-6. If the tablet has **Dolby Atmos** or similar sound "enhancement", turn it off
+6. Pair the tablets: touch the photo, and press **Call** or **Bell** next to a room marked
+   *new*. Check that both tablets show the same code and press **Accept** on the other one.
+   With more than two tablets, pair each two that should be able to call each other.
+   (If a tablet never shows up, use *Settings → Add room by IP address…*.)
+7. If the tablet has **Dolby Atmos** or similar sound "enhancement", turn it off
    (Settings → Sound). It confuses echo cancellation and causes echo/noise during calls.
 
 The port (default 47555) must be the same on both tablets.
@@ -97,9 +104,13 @@ The port (default 47555) must be the same on both tablets.
 - By default, an incoming call only **rings**: the camera and microphone are not turned on
   until someone at that tablet presses **Answer**. *Answer calls automatically* turns this off
   for that tablet; only enable it where everyone in that room is fine with it.
-- Each tablet only accepts connections from the **IP address configured as the other
-  tablet**; everything else is ignored. There is no other authentication, so use it on a
-  network you trust (your home Wi-Fi, not a public one).
+- Tablets only take calls and bells from tablets they're **paired** with, and pairing needs
+  someone at the other tablet to press **Accept** after checking that both show the same code.
+  Pairing creates a secret key only those two tablets know (ECDH key exchange); every
+  connection proves it, and every message is signed, so nobody else on the network can call,
+  ring or tamper with a call. The signalling isn't encrypted, as it contains nothing secret.
+- Anyone on the same network can *ask* to pair, which shows a request on the tablet. Remove a
+  room in *Settings → Rooms*; the other tablet forgets this one too.
 - Audio and video are encrypted by WebRTC (DTLS-SRTP) and go directly between the tablets.
   Nothing leaves your network.
 
@@ -125,8 +136,9 @@ See what happened on a tablet, including why a call ended:
 adb logcat -d | grep CallManager
 ```
 
-- **"Not reachable right now"**: check the IP address and port on both tablets, and that both
-  are on the same network. Some routers have "client/AP isolation" turned on for Wi-Fi, which
+- **A tablet doesn't show up, or shows a grey dot**: check that the app runs on it, that both
+  are on the same network and use the same port. Some routers block the discovery broadcasts:
+  pair with *Add room by IP address…* instead. Some routers have "client/AP isolation" turned on for Wi-Fi, which
   blocks devices from talking to each other.
 - **Echo or noise**: turn off Dolby/sound enhancements, lower *Call volume*, or try the
   *built-in echo cancellation* setting.
@@ -137,13 +149,20 @@ adb logcat -d | grep CallManager
 
 - `IntercomService`: a foreground service holding CPU and Wi-Fi locks so the tablet is always
   reachable. It wakes the screen on an incoming call or bell.
+- `Discovery`: UDP broadcasts on port 47555 (`who` / `here`) so tablets find each other and
+  keep track of each other's current IP address.
+- `Peers` / `Link`: pairing (ECDH, 4-digit comparison code, `pair` → `pairwait` →
+  `pairok`/`pairno`), the stored pair keys, and authenticated connections (`auth` → `chal` →
+  `proof`, then every message carries a sequence number and HMAC).
 - `CallManager`: listens on TCP 47555. A call connects to the other tablet and exchanges
-  one-line JSON messages (`hello` → `ringing` → `ok` / `decline` / `noanswer`, WebRTC `offer`/`answer`/`ice`, `bye`).
-  `ping`/`pong` every 20 s drives the "Online" indicator, and `bell` rings the other tablet.
+  signed one-line JSON messages (`hello` → `ringing` → `ok` / `decline` / `noanswer`, WebRTC
+  `offer`/`answer`/`ice`, `bye`). `ping`/`pong` every 20 s drives the online dots, and `bell`
+  rings the other tablet.
   Audio/video is WebRTC, peer-to-peer on the LAN (no STUN/TURN). On a network hiccup the
   caller re-opens the socket (`resume`) and does an ICE restart; the call only ends if it
   can't recover within 30 s.
-- `MainActivity`: slideshow, touch buttons, call screen, brightness.
+- `MainActivity`: slideshow, room rows, call screen, brightness. `PairingDialogs`: the
+  pairing dialogs on both tablets.
 - `Albums`: lists the tablet's photo albums from Android's media library, and copies shared
   photos into the app's own album.
 - `ShareActivity`: the *Share → Wall Intercom* target.

@@ -9,14 +9,27 @@ import java.net.Socket
 import kotlin.concurrent.thread
 
 /**
- * One TCP connection to the other tablet. Messages are single-line JSON objects.
- * [onMessage] and [onClosed] are called from the reader thread.
+ * One TCP connection to another tablet. Messages are single-line JSON objects.
+ * [onMessage] and [onClosed] are called from the reader thread. Once [session] is set, outgoing
+ * messages are signed; incoming ones are passed on as received (the owner unwraps them, so that
+ * switching to the session happens in order with the messages).
  */
 class Conn(
     private val socket: Socket,
     private val onMessage: (Conn, JSONObject) -> Unit,
     private val onClosed: (Conn) -> Unit,
+    /** An existing reader, if the handshake already read from this socket. */
+    private val reader: BufferedReader? = null,
 ) {
+    /** Set once both sides proved they share the pair key. */
+    @Volatile
+    var session: Session? = null
+    /** The paired tablet at the other end, once authenticated. */
+    @Volatile
+    var peerId: String? = null
+    /** Server side, between auth and proof: (peer id, client nonce, server nonce). */
+    var pendingAuth: Triple<String, String, String>? = null
+
     private val out = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
 
     /** Address of the other end of this connection. */
@@ -29,7 +42,7 @@ class Conn(
     fun start(): Conn {
         thread(name = "intercom-conn", isDaemon = true) {
             try {
-                val r = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
+                val r = reader ?: BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
                 while (true) {
                     val line = r.readLine() ?: break
                     if (line.isNotBlank()) onMessage(this, JSONObject(line))
@@ -46,7 +59,7 @@ class Conn(
         if (closed) return
         try {
             synchronized(out) {
-                out.write(msg.toString())
+                out.write((session?.wrap(msg) ?: msg).toString())
                 out.write("\n")
                 out.flush()
             }

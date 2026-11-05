@@ -5,7 +5,6 @@ import android.os.Build
 
 /** All user settings, stored in SharedPreferences (thread-safe). */
 class Prefs(ctx: Context) {
-    private val res = ctx.applicationContext.resources
     private val p = ctx.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     private fun str(key: String, def: String) = p.getString(key, def) ?: def
@@ -20,12 +19,20 @@ class Prefs(ctx: Context) {
         }
     }.apply()
 
-    /** Name shown on the other tablet . Must differ between the two tablets. */
+    /** Name of this room, shown on the other tablets. */
     var myName: String get() = str("myName", Build.MODEL); set(v) = put("myName", v)
-    var peerIp: String get() = str("peerIp", ""); set(v) = put("peerIp", v)
-    /** Learned automatically from the other tablet. */
-    var peerName: String get() = str("peerName", res.getString(R.string.default_peer_name)); set(v) = put("peerName", v)
+    /** Same TCP (calls) and UDP (discovery) port on all tablets. */
     var port: Int get() = int("port", 47555); set(v) = put("port", v)
+
+    /** Permanent random identity of this tablet; the other tablets know it by this. */
+    val deviceId: String
+        get() = synchronized(Prefs::class.java) {
+            p.getString("deviceId", null)
+                ?: java.util.UUID.randomUUID().toString().also { p.edit().putString("deviceId", it).commit() }
+        }
+
+    /** The paired tablets as JSON; use [Peers]. */
+    var peersJson: String? get() = p.getString("peers", null); set(v) = put("peers", v)
 
     /** The slideshow shows either an album (gallery folder) or a folder picked with "Other folder…". */
     var albumId: String? get() = p.getString("albumId", null); set(v) = put("albumId", v)

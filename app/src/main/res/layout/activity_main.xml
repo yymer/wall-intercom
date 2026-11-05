@@ -74,60 +74,13 @@
                 android:textSize="22sp"
                 android:visibility="gone" />
 
+            <!-- One row per room (Call + Bell), built in MainActivity.rebuildRooms() -->
             <LinearLayout
+                android:id="@+id/roomsList"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/callBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_call"
-                    android:drawableStart="@drawable/ic_stat"
-                    android:drawablePadding="12dp"
-                    android:elevation="0dp"
-                    android:minWidth="0dp"
-                    android:minHeight="0dp"
-                    android:paddingStart="32dp"
-                    android:paddingTop="14dp"
-                    android:paddingEnd="36dp"
-                    android:paddingBottom="14dp"
-                    android:stateListAnimator="@null"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="22sp" />
-
-                <Button
-                    android:id="@+id/bellBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:background="@drawable/bg_bell"
-                    android:drawableStart="@drawable/ic_bell"
-                    android:drawablePadding="12dp"
-                    android:elevation="0dp"
-                    android:minWidth="0dp"
-                    android:minHeight="0dp"
-                    android:paddingStart="32dp"
-                    android:paddingTop="14dp"
-                    android:paddingEnd="36dp"
-                    android:paddingBottom="14dp"
-                    android:stateListAnimator="@null"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="22sp" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/peerStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:shadowColor="#CC000000"
-                android:shadowRadius="6"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical" />
         </LinearLayout>
 
         <TextView

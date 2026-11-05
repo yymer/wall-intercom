@@ -32,11 +32,13 @@ class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var col: LinearLayout
     private lateinit var sourceLabel: TextView
+    private lateinit var roomsCol: LinearLayout
     private val savers = mutableListOf<() -> Unit>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
+        CallManager.init(this)
         col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(32), dp(16), dp(32), dp(32))
@@ -49,10 +51,12 @@ class SettingsActivity : Activity() {
             prefs.myName = it.trim().ifEmpty { getString(R.string.default_my_name) }
         }
 
-        heading(R.string.h_other_tablet)
-        textField(R.string.peer_ip, prefs.peerIp, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI) {
-            prefs.peerIp = it.trim()
-        }
+        heading(R.string.h_rooms)
+        roomsCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(roomsCol)
+        rebuildRooms()
+        button(R.string.add_by_ip) { addByIp() }
+        label(getString(R.string.add_by_ip_hint))
         intField(R.string.port, prefs.port, 1024..65535) { prefs.port = it }
 
         heading(R.string.h_slideshow)
@@ -154,6 +158,67 @@ class SettingsActivity : Activity() {
         if (requestCode != REQ_READ) return
         if (results.firstOrNull() == PackageManager.PERMISSION_GRANTED) showAlbums()
         else toast(getString(R.string.need_photo_permission))
+    }
+
+    // ---------------------------------------------------------------- rooms
+
+    private fun rebuildRooms() {
+        roomsCol.removeAllViews()
+        val peers = Peers.all()
+        if (peers.isEmpty()) {
+            roomsCol.addView(TextView(this).apply {
+                setText(R.string.rooms_none)
+                textSize = 16f
+                setPadding(0, dp(10), 0, 0)
+            })
+            return
+        }
+        for (p in peers) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, dp(6), 0, 0)
+            }
+            row.addView(TextView(this).apply {
+                text = p.name
+                textSize = 20f
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(Button(this).apply {
+                setText(R.string.remove)
+                isAllCaps = false
+                setOnClickListener {
+                    AlertDialog.Builder(this@SettingsActivity)
+                        .setMessage(getString(R.string.remove_confirm, p.name))
+                        .setPositiveButton(R.string.remove) { _, _ ->
+                            CallManager.unpair(p.id)
+                            rebuildRooms()
+                        }
+                        .setNegativeButton(R.string.cancel, null)
+                        .show()
+                }
+            })
+            roomsCol.addView(row)
+        }
+    }
+
+    private fun addByIp() {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            hint = "192.168.1.23"
+            isSingleLine = true
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.add_by_ip)
+            .setMessage(R.string.ip_prompt)
+            .setView(input)
+            .setPositiveButton(R.string.pair) { _, _ ->
+                val ip = input.text.toString().trim()
+                if (ip.isNotEmpty()) {
+                    PairingDialogs.pair(this, ip, prefs.port, null, onPaired = { rebuildRooms() })
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     // ---------------------------------------------------------------- albums
