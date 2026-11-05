@@ -56,6 +56,27 @@ class Prefs(ctx: Context) {
     /** Off by default: someone in the room has to press Answer before the camera turns on. */
     var autoAnswer: Boolean get() = bool("autoAnswer", false); set(v) = put("autoAnswer", v)
 
+    /**
+     * Whether Wall Intercom offers itself as the tablet's Home app. Stored by Android as the
+     * enabled state of the HomeScreen alias in the manifest, not in these settings.
+     */
+    object HomeScreen {
+        private fun component(ctx: Context) = android.content.ComponentName(ctx, "app.wallintercom.HomeScreen")
+
+        fun isEnabled(ctx: Context) = ctx.packageManager.getComponentEnabledSetting(component(ctx)) ==
+            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+
+        fun setEnabled(ctx: Context, on: Boolean) {
+            if (on == isEnabled(ctx)) return
+            ctx.packageManager.setComponentEnabledSetting(
+                component(ctx),
+                if (on) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, // = off (manifest)
+                android.content.pm.PackageManager.DONT_KILL_APP,
+            )
+        }
+    }
+
     fun isNight(hour: Int): Boolean {
         val s = nightStart
         val e = nightEnd

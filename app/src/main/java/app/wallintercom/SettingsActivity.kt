@@ -51,6 +51,7 @@ class SettingsActivity : Activity() {
             prefs.myName = it.trim().ifEmpty { getString(R.string.default_my_name) }
         }
         checkBox(R.string.auto_start, prefs.autoStart) { prefs.autoStart = it }
+        checkBox(R.string.use_as_home, Prefs.HomeScreen.isEnabled(this)) { Prefs.HomeScreen.setEnabled(this, it) }
 
         heading(R.string.h_rooms)
         roomsCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }

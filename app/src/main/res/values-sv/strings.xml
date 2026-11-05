@@ -117,4 +117,5 @@
     <string name="err_forgotten">%1$s känner inte igen den här surfplattan längre. Tryck på bilden för att para ihop igen.</string>
     <string name="rooms_all_offline">Inget av de andra rummen går att nå just nu.</string>
     <string name="auto_start">Starta automatiskt när surfplattan slås på (så att den kan ta emot samtal efter en omstart)</string>
+    <string name="use_as_home">Använd som surfplattans startskärm (hemknappen och omstarter kommer alltid tillbaka hit; för surfplattor som bara kör Wall Intercom)</string>
 </resources>

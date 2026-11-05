@@ -23,7 +23,8 @@ and talk directly to each other.
   (for up to 30 s) instead of hanging up.
 - Calls hang up automatically after 15 minutes (configurable), so a forgotten call doesn't
   leave a camera on all night.
-- Dims at night, keeps itself running, survives reboots (it acts as the home screen).
+- Dims at night, keeps itself running, and can start by itself after a reboot (optional), or
+  act as the tablet's home screen on a tablet used only for this.
 - English and Swedish, following each tablet's language setting.
 
 Tested on two Lenovo Tab M10 (TB-X505F) running Android 10 and a Lenovo Tab 3 7" (TB3-710F)
@@ -73,9 +74,10 @@ will refuse to install them over the old version.
    - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*
      (Android 6 and newer; Android 5 doesn't have these).
    - **Save**.
-4. Optional, for a dedicated wall tablet: press the Home button and choose **Wall Intercom →
-   Always**. It is then the home screen, so it also comes back if someone leaves it (and starts
-   after a reboot even without *Start automatically*).
+4. Optional, for a tablet that only runs Wall Intercom: tick *Use as the tablet's home screen*
+   in settings, then press the Home button and choose **Wall Intercom → Always**. The Home
+   button and restarts then always come back to it. (Off by default, so it doesn't compete with
+   the tablet's normal launcher.)
 5. Android settings → *Security → Screen lock* → **None**, so calls aren't stuck behind the
    lock screen.
 6. Pair the tablets: touch the photo, and press **Call** or **Bell** next to a room marked

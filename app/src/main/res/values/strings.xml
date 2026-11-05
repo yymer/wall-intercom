@@ -118,4 +118,5 @@
     <string name="err_forgotten">%1$s doesn\'t know this tablet anymore. Touch the photo to pair again.</string>
     <string name="rooms_all_offline">None of the other rooms is reachable right now.</string>
     <string name="auto_start">Start automatically when the tablet is turned on (so it can take calls after a restart)</string>
+    <string name="use_as_home">Use as the tablet\'s home screen (the Home button and restarts always come back here; for tablets that only run Wall Intercom)</string>
 </resources>
