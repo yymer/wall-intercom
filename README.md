@@ -78,8 +78,9 @@ will refuse to install them over the old version.
    in settings, then press the Home button and choose **Wall Intercom → Always**. The Home
    button and restarts then always come back to it. (Off by default, so it doesn't compete with
    the tablet's normal launcher.)
-5. Android settings → *Security → Screen lock* → **None**, so calls aren't stuck behind the
-   lock screen.
+5. Android settings → *Security → Screen lock* → **None** (or *Swipe*), so calls aren't stuck
+   behind the lock screen. With a PIN, pattern or password, Android keeps apps' data locked
+   after a restart until someone unlocks the tablet, so Wall Intercom can't start by itself.
 6. Pair the tablets: touch the photo, and press **Call** or **Bell** next to a room marked
    *new*. Check that both tablets show the same code and press **Accept** on the other one.
    With more than two tablets, pair each two that should be able to call each other.
@@ -87,7 +88,39 @@ will refuse to install them over the old version.
 7. If the tablet has **Dolby Atmos** or similar sound "enhancement", turn it off
    (Settings → Sound). It confuses echo cancellation and causes echo/noise during calls.
 
-The port (default 47555) must be the same on both tablets.
+The port (default 47555) must be the same on all tablets.
+
+## Keeping the tablets plugged in
+
+Wall tablets are usually on a charger around the clock. Kept at 100% all the time, a lithium
+battery wears out faster and can eventually swell, so if the tablet can **stop charging at a
+lower level**, turn that on:
+
+- Many tablets have this built in, under names like *Battery protection mode* (Lenovo, stops
+  at 60%), *Protect battery* (Samsung, 85%), *Battery care* / *charging limit* (Sony, Asus) or
+  *Charging optimization* (Google Pixel Tablet, 80%). Look in *Settings → Battery*; names and
+  limits vary by brand and Android version.
+- Older tablets (like many on Android 5) don't have it. A smart plug or timer that only
+  charges a few hours a day does a similar job; keep an eye on the battery level at first.
+- Whatever you use, check now and then that the back of the tablet isn't bulging.
+
+### Silencing the "battery protection" notification
+
+When charging stops at the limit, some tablets post a notification with a sound, e.g. Lenovo's
+*Battery Protection mode* (from the system app *LctApplication*). Long-pressing it may say
+**"These notifications can't be modified"**: the manufacturer locked it. It uses the tablet's
+default notification sound, though, so silence that instead:
+
+- *Settings → Sound → Advanced → Default notification sound* → **None**. The notification
+  still shows, silently. Other notifications that use the default sound go silent too, which
+  on a wall tablet is usually what you want.
+- If it also beeps when charging pauses and resumes: *Settings → Sound → Advanced →* turn off
+  *Charging sounds and vibration*.
+
+This doesn't affect Wall Intercom: the bell and incoming-call ringing play on the *alarm*
+volume, and the short chime after *Answer* is a generated tone. Avoid setting the
+*notification volume* to 0 or using *Do Not Disturb* instead, as both also mute that chime,
+which tells the room the camera just turned on.
 
 ## Settings
 
