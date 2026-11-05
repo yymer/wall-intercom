@@ -5,7 +5,7 @@ between two rooms. No server, no cloud, no accounts: the tablets talk directly t
 over your home Wi-Fi.
 
 - Full-screen, cross-fading **slideshow** from a folder on the tablet.
-- Touch the screen and two small buttons appear: **Call** and **Bell**.
+- Touch the screen and two small buttons appear: **Call** and **Bell**. They stay for 25 s.
 - **Call** starts a video call. The other tablet **answers automatically**: it wakes up,
   plays a short chime (so the room knows the camera is on) and the call starts.
   Either side can press **End call**.
@@ -19,6 +19,12 @@ over your home Wi-Fi.
 - English and Swedish, following each tablet's language setting.
 
 Tested on two Lenovo Tab M10 (TB-X505F) running Android 10.
+
+| Touch the photo: Call and Bell | Bell ringing on the other tablet | The other tablet got the bell |
+|---|---|---|
+| ![Call and Bell buttons over the photo](docs/buttons.jpg) | ![Bell button turns gold while ringing](docs/bell-ringing.jpg) | ![Bell from Bedroom banner](docs/bell-received.jpg) |
+
+*(Screenshots from the emulator with a generated test picture.)*
 
 ## Requirements
 
