@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bell button while the bell is ringing on the other tablet: warm gold glow -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#D9C8901E" />
+    <stroke android:width="2dp" android:color="#CCFFE08A" />
+    <corners android:radius="100dp" />
+</shape>

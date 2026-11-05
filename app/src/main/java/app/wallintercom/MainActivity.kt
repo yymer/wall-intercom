@@ -96,8 +96,13 @@ class MainActivity : Activity(), CallManager.Listener {
             CallManager.dial()
         }
         bellBtn.setOnClickListener {
-            hideOverlay()
-            CallManager.sendBell()
+            // Buttons stay up; the bell button shows it's ringing until the bell has played.
+            setBellRinging(true)
+            showOverlay() // restart the auto-hide timer
+            CallManager.sendBell { ok ->
+                if (ok) handler.postDelayed({ setBellRinging(false) }, BELL_SOUND_MS)
+                else setBellRinging(false)
+            }
         }
         findViewById<Button>(R.id.endBtn).setOnClickListener { CallManager.hangup() }
         val settingsBtn = findViewById<View>(R.id.settingsBtn)
@@ -214,6 +219,11 @@ class MainActivity : Activity(), CallManager.Listener {
         if (overlay.visibility == View.VISIBLE) hideOverlay() else showOverlay()
     }
 
+    private fun setBellRinging(ringing: Boolean) {
+        bellBtn.isEnabled = !ringing
+        bellBtn.setBackgroundResource(if (ringing) R.drawable.bg_bell_ringing else R.drawable.bg_bell)
+    }
+
     private fun showOverlay() {
         updateCallButton()
         overlay.visibility = View.VISIBLE
@@ -221,7 +231,7 @@ class MainActivity : Activity(), CallManager.Listener {
         setBrightness(true)
         CallManager.pingNow()
         handler.removeCallbacks(hideOverlayRunnable)
-        handler.postDelayed(hideOverlayRunnable, 15_000)
+        handler.postDelayed(hideOverlayRunnable, OVERLAY_TIMEOUT_MS)
     }
 
     private fun hideOverlay() {
@@ -400,5 +410,12 @@ class MainActivity : Activity(), CallManager.Listener {
             Log.w("Slideshow", "can't decode $uri", e)
             return null
         }
+    }
+
+    companion object {
+        /** How long the Call/Bell buttons stay up after the last touch. */
+        private const val OVERLAY_TIMEOUT_MS = 25_000L
+        /** Roughly the length of the ding-dong; the bell button stays "ringing" this long. */
+        private const val BELL_SOUND_MS = 2_600L
     }
 }

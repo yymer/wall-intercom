@@ -190,11 +190,16 @@ object CallManager {
 
     fun pingNow() = timers.execute { pingPeer() }
 
-    /** Rings the bell on the other tablet. Result is reported as an info message. */
-    fun sendBell() = timers.execute {
+    /**
+     * Rings the bell on the other tablet. [onDone] is called on the main thread with whether the
+     * other tablet received it; failures are also shown as an info message.
+     */
+    fun sendBell(onDone: (Boolean) -> Unit) = timers.execute {
         val ip = prefs.peerIp.trim()
         if (ip.isEmpty()) {
-            notifyInfo(ctx.getString(R.string.err_no_ip)); return@execute
+            notifyInfo(ctx.getString(R.string.err_no_ip))
+            main.post { onDone(false) }
+            return@execute
         }
         val ok = try {
             Socket().use { s ->
@@ -210,10 +215,8 @@ object CallManager {
             false
         }
         setPeer(ok)
-        notifyInfo(
-            if (ok) ctx.getString(R.string.bell_sent, prefs.peerName)
-            else ctx.getString(R.string.err_unreachable, prefs.peerName)
-        )
+        if (!ok) notifyInfo(ctx.getString(R.string.err_unreachable, prefs.peerName))
+        main.post { onDone(ok) }
     }
 
     /** Re-bind the listening socket (e.g. after the port changed). */
