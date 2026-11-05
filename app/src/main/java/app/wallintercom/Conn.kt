@@ -19,6 +19,9 @@ class Conn(
 ) {
     private val out = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
 
+    /** Address of the other end of this connection. */
+    val remoteAddress: java.net.InetAddress? get() = socket.inetAddress
+
     @Volatile
     var closed = false
         private set

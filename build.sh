@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
-# Builds the APK. Output: app/build/outputs/apk/debug/app-debug.apk
+# Builds the APK -> ./wall-intercom.apk
+#   ./build.sh             ARM only (real tablets)
+#   ./build.sh -Pemulator  also x86_64, for the Android emulator
+#
+# Needs JDK 17 or 21 and the Android SDK (platform 35). Set JAVA_HOME / ANDROID_HOME,
+# or it falls back to a few common install locations.
 set -e
 cd "$(dirname "$0")"
-export JAVA_HOME="$HOME/.local/opt/jdk-21.0.13+9"
-export ANDROID_HOME="$HOME/Android/Sdk"
+
+if [ -z "$JAVA_HOME" ]; then
+    for d in "$HOME"/.local/opt/jdk-21* /usr/lib/jvm/java-21-openjdk* /usr/lib/jvm/java-17-openjdk*; do
+        if [ -x "$d/bin/java" ]; then export JAVA_HOME="$d"; break; fi
+    done
+fi
+export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
+
 ./gradlew assembleDebug "$@"
 cp app/build/outputs/apk/debug/app-debug.apk wall-intercom.apk
 echo "Built: $(pwd)/wall-intercom.apk"

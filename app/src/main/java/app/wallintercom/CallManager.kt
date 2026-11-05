@@ -284,6 +284,12 @@ object CallManager {
     }
 
     private fun onMessage(c: Conn, m: JSONObject) {
+        // Calls are auto-answered, so only ever talk to the configured other tablet.
+        if (!isFromPeer(c)) {
+            Log.w(TAG, "ignoring connection from ${c.remoteAddress?.hostAddress} (not the other tablet)")
+            c.close()
+            return
+        }
         when (m.optString("t")) {
             "ping" -> {
                 c.send(msg("pong").put("name", prefs.myName))
@@ -297,6 +303,16 @@ object CallManager {
             "hello" -> onHello(c, m.optString("name"), m.optString("sid"))
             "resume" -> onResumeRequest(c, m.optString("sid"))
             else -> if (c === conn) onCallMessage(m)
+        }
+    }
+
+    private fun isFromPeer(c: Conn): Boolean {
+        val ip = prefs.peerIp.trim()
+        if (ip.isEmpty()) return false
+        return try {
+            c.remoteAddress != null && c.remoteAddress == java.net.InetAddress.getByName(ip)
+        } catch (_: Exception) {
+            false
         }
     }
 
