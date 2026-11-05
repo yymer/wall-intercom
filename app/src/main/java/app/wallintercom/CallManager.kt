@@ -41,7 +41,12 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
-enum class CallState { IDLE, DIALING, CONNECTING, IN_CALL, RECONNECTING }
+/**
+ * DIALING: we called, waiting for the other tablet to respond.
+ * RINGING: we called, the other tablet is ringing (waiting for someone there to answer).
+ * INCOMING: the other tablet is calling us; camera/mic stay off until someone presses Answer.
+ */
+enum class CallState { IDLE, DIALING, RINGING, INCOMING, CONNECTING, IN_CALL, RECONNECTING }
 
 /** Forwards video frames to whatever renderer is currently attached. */
 class ProxyVideoSink : VideoSink {
@@ -57,7 +62,8 @@ class ProxyVideoSink : VideoSink {
  *
  * Signalling: each tablet listens on a TCP port. The caller connects to the other tablet's IP
  * and the two exchange one-line JSON messages:
- *   caller -> hello{name,sid}    callee -> ok{name} (auto-answer) | busy
+ *   caller -> hello{name,sid}    callee -> ok{name} (answered) | busy
+ *                                callee -> ringing, then later ok{name} | decline | noanswer
  *   caller -> offer{sdp}         callee -> answer{sdp}
  *   both   -> ice{mid,idx,sdp}   either -> bye
  *   caller -> resume{name,sid}   callee -> resumed | gone   (new socket after the old one died)
@@ -76,11 +82,16 @@ object CallManager {
     private const val RECONNECT_GRACE_MS = 30_000L
     private const val RECONNECT_TICK_MS = 3_000L
     private const val ICE_RESTART_INTERVAL_MS = 6_000L
+    /** How long an incoming call rings before it counts as missed. */
+    private const val RING_TIMEOUT_MS = 45_000L
+    private const val RING_REPEAT_MS = 4_000L
 
     interface Listener {
         fun onCallState(state: CallState, peer: String, info: String?)
         fun onPeerStatus(online: Boolean, peer: String)
         fun onBell(from: String)
+        /** Our outgoing call was declined or not answered; shown next to the Call button. */
+        fun onCallNotAnswered(info: String)
     }
 
     private lateinit var ctx: Context
@@ -133,6 +144,8 @@ object CallManager {
     private var reconnectDeadline = 0L
     private var lastIceRestart = 0L
     private var resumeInFlight = false
+    /** Bumped whenever a connect/ring timeout is armed, so only the latest one can fire. */
+    private var timeoutGen = 0
 
     @Volatile
     private var serverSocket: ServerSocket? = null
@@ -180,12 +193,27 @@ object CallManager {
         sessionId = UUID.randomUUID().toString()
         c.start()
         c.send(msg("hello").put("name", prefs.myName).put("sid", sessionId))
-        armTimeout(id)
+        armTimeout(id, CONNECT_TIMEOUT_MS)
     }
 
     fun hangup() = exec.execute {
         Log.i(TAG, "End call pressed")
-        if (state != CallState.IDLE) endCall(null)
+        when (state) {
+            CallState.IDLE -> {}
+            CallState.INCOMING -> {
+                conn?.send(msg("decline"))
+                endCall(null, notifyPeer = false)
+            }
+            else -> endCall(null)
+        }
+    }
+
+    /** Answer a ringing incoming call: only now are the camera and microphone turned on. */
+    fun answer() = exec.execute {
+        if (state != CallState.INCOMING) return@execute
+        val c = conn ?: return@execute
+        Log.i(TAG, "Answer pressed")
+        startAnswered(c)
     }
 
     fun pingNow() = timers.execute { pingPeer() }
@@ -287,7 +315,7 @@ object CallManager {
     }
 
     private fun onMessage(c: Conn, m: JSONObject) {
-        // Calls are auto-answered, so only ever talk to the configured other tablet.
+        // Only ever talk to the configured other tablet.
         if (!isFromPeer(c)) {
             Log.w(TAG, "ignoring connection from ${c.remoteAddress?.hostAddress} (not the other tablet)")
             c.close()
@@ -321,14 +349,15 @@ object CallManager {
 
     private fun onHello(c: Conn, from: String, sid: String) {
         when {
-            state == CallState.IDLE -> accept(c, from, sid)
+            state == CallState.IDLE -> if (prefs.autoAnswer) accept(c, from, sid) else ring(c, from, sid)
             // The other tablet gave up on a broken call and is calling again: start over.
             state == CallState.RECONNECTING && from == prefs.peerName -> {
                 endCall(null, notifyPeer = false)
                 accept(c, from, sid)
             }
             // Both pressed "call" at the same moment: the tablet whose name sorts first keeps
-            // its outgoing call, the other one drops its own and accepts.
+            // its outgoing call, the other one drops its own and accepts (no need to ring:
+            // someone here just pressed Call).
             state == CallState.DIALING && prefs.myName > from -> {
                 val old = conn
                 conn = null
@@ -342,26 +371,71 @@ object CallManager {
         }
     }
 
-    private fun accept(c: Conn, from: String, sid: String) {
+    private fun takeIncoming(c: Conn, from: String, sid: String) {
         conn = c
         isCaller = false
         sessionId = sid
-        val id = ++callId
+        ++callId
         if (from.isNotBlank()) prefs.peerName = from
+    }
+
+    /** Answer right away (auto-answer setting, or both tablets called each other at once). */
+    private fun accept(c: Conn, from: String, sid: String) {
+        takeIncoming(c, from, sid)
+        main.post { onWakeUp?.invoke() }
+        startAnswered(c)
+    }
+
+    /** Ring here and wait for someone to press Answer or Decline. */
+    private fun ring(c: Conn, from: String, sid: String) {
+        takeIncoming(c, from, sid)
+        val id = callId
+        Log.i(TAG, "incoming call from ${prefs.peerName}, ringing")
+        setState(CallState.INCOMING)
+        c.send(msg("ringing"))
+        main.post { onWakeUp?.invoke() }
+        ringTick(id)
+        val gen = ++timeoutGen
+        timers.schedule({
+            exec.execute {
+                if (callId == id && timeoutGen == gen && state == CallState.INCOMING) {
+                    Log.i(TAG, "nobody answered")
+                    conn?.send(msg("noanswer"))
+                    endCall(ctx.getString(R.string.missed_call, prefs.peerName), notifyPeer = false)
+                }
+            }
+        }, RING_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun ringTick(id: Int) {
+        if (callId != id || state != CallState.INCOMING) return
+        playBell()
+        timers.schedule({ exec.execute { ringTick(id) } }, RING_REPEAT_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun startAnswered(c: Conn) {
+        val id = callId
         setState(CallState.CONNECTING)
         c.send(msg("ok").put("name", prefs.myName))
-        main.post { onWakeUp?.invoke() }
         chime()
         if (!startMedia()) return
-        armTimeout(id)
+        armTimeout(id, CONNECT_TIMEOUT_MS)
     }
 
     private fun onCallMessage(m: JSONObject) {
         val p = pc
         when (m.optString("t")) {
-            "ok" -> if (state == CallState.DIALING) {
+            "ringing" -> if (state == CallState.DIALING) {
+                setState(CallState.RINGING)
+                // Give them time to walk to the tablet; the callee gives up first.
+                armTimeout(callId, RING_TIMEOUT_MS + CONNECT_TIMEOUT_MS)
+            }
+            "decline" -> endNotAnswered(R.string.err_declined, notifyPeer = false)
+            "noanswer" -> endNotAnswered(R.string.err_no_answer, notifyPeer = false)
+            "ok" -> if (state == CallState.DIALING || state == CallState.RINGING) {
                 m.optString("name").takeIf { it.isNotBlank() }?.let { prefs.peerName = it }
                 setState(CallState.CONNECTING)
+                armTimeout(callId, CONNECT_TIMEOUT_MS)
                 if (startMedia()) createOffer()
             }
             "busy" -> endCall(ctx.getString(R.string.err_busy, prefs.peerName), notifyPeer = false)
@@ -373,7 +447,7 @@ object CallManager {
             }
             "bye" -> {
                 Log.i(TAG, "other tablet hung up")
-                endCall(null, notifyPeer = false)
+                endCall(missedCallInfo(), notifyPeer = false)
             }
             "resumed" -> if (state == CallState.RECONNECTING) {
                 if (iceConnected()) {
@@ -397,8 +471,12 @@ object CallManager {
             startReconnecting()
             return
         }
-        endCall(ctx.getString(R.string.err_not_connected), notifyPeer = false)
+        endCall(missedCallInfo() ?: ctx.getString(R.string.err_not_connected), notifyPeer = false)
     }
+
+    /** If the caller gave up while it was still ringing here, tell the room they missed a call. */
+    private fun missedCallInfo() =
+        if (state == CallState.INCOMING) ctx.getString(R.string.missed_call, prefs.peerName) else null
 
     // ---------------------------------------------------------------- reconnecting
 
@@ -522,14 +600,24 @@ object CallManager {
         }
     }
 
-    private fun armTimeout(id: Int) {
+    private fun armTimeout(id: Int, ms: Long) {
+        val gen = ++timeoutGen
         timers.schedule({
             exec.execute {
-                if (callId == id && (state == CallState.DIALING || state == CallState.CONNECTING)) {
-                    endCall(ctx.getString(R.string.err_timeout, prefs.peerName))
+                val waiting = state == CallState.DIALING || state == CallState.RINGING ||
+                    state == CallState.CONNECTING
+                if (callId == id && timeoutGen == gen && waiting) {
+                    if (state == CallState.RINGING) endNotAnswered(R.string.err_no_answer, notifyPeer = true)
+                    else endCall(ctx.getString(R.string.err_timeout, prefs.peerName))
                 }
             }
-        }, CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        }, ms, TimeUnit.MILLISECONDS)
+    }
+
+    private fun endNotAnswered(infoRes: Int, notifyPeer: Boolean) {
+        val info = ctx.getString(infoRes, prefs.peerName)
+        endCall(null, notifyPeer)
+        main.post { listener?.onCallNotAnswered(info) }
     }
 
     private fun endCall(info: String?, notifyPeer: Boolean = true) {

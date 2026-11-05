@@ -59,4 +59,12 @@
     <string name="bell_from">🔔 Bell from %1$s</string>
     <string name="bell_volume">Bell volume (%)</string>
     <string name="state_reconnecting">Reconnecting…</string>
+    <string name="answer">Answer</string>
+    <string name="decline">Decline</string>
+    <string name="state_ringing">Ringing %1$s…</string>
+    <string name="state_incoming">Incoming call</string>
+    <string name="missed_call">Missed call from %1$s</string>
+    <string name="err_declined">%1$s can\'t answer right now</string>
+    <string name="err_no_answer">%1$s didn\'t answer</string>
+    <string name="auto_answer">Answer calls automatically (the camera turns on without anyone pressing Answer)</string>
 </resources>

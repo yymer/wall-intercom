@@ -6,9 +6,11 @@ over your home Wi-Fi.
 
 - Full-screen, cross-fading **slideshow** from a folder on the tablet.
 - Touch the screen and two small buttons appear: **Call** and **Bell**. They stay for 25 s.
-- **Call** starts a video call. The other tablet **answers automatically**: it wakes up,
-  plays a short chime (so the room knows the camera is on) and the call starts.
-  Either side can press **End call**.
+- **Call** rings the other tablet: it wakes up and shows **Answer** / **Decline**. The camera
+  and microphone stay off until someone there presses **Answer** (then a short chime plays
+  so the room knows the camera is on). Unanswered calls stop after 45 s and show
+  "Missed call from …". Either side can press **End call**.
+- Optionally, a tablet can **answer automatically** (off by default, see settings).
 - **Bell** rings a ding-dong on the other tablet and shows "🔔 Bell from …" without turning on
   any camera, so the other room can call back when it suits them.
 - If the Wi-Fi hiccups during a call it shows **Reconnecting…** and recovers by itself
@@ -75,6 +77,7 @@ The port (default 47555) must be the same on both tablets.
 | Fill the whole screen | on | Crops pictures slightly instead of showing black bars |
 | Brightness while showing pictures | 40% | Full brightness when touched or in a call |
 | Night hours / night brightness | 22–07, 2% | 0% turns the backlight off; a touch, call or bell wakes it |
+| Answer calls automatically | off | When on, incoming calls connect without anyone pressing Answer |
 | Call volume | 80% | |
 | Bell volume | 80% | Plays on Android's *alarm* volume channel |
 | Hang up automatically after | 15 min | 0 = never |
@@ -83,8 +86,9 @@ The port (default 47555) must be the same on both tablets.
 
 ## Security and privacy
 
-- Calls are **answered automatically**. Only use this where everyone in both rooms is
-  fine with that.
+- By default, an incoming call only **rings**: the camera and microphone are not turned on
+  until someone at that tablet presses **Answer**. *Answer calls automatically* turns this off
+  for that tablet; only enable it where everyone in that room is fine with it.
 - Each tablet only accepts connections from the **IP address configured as the other
   tablet**; everything else is ignored. There is no other authentication, so use it on a
   network you trust (your home Wi-Fi, not a public one).
@@ -126,7 +130,7 @@ adb logcat -d | grep CallManager
 - `IntercomService`: a foreground service holding CPU and Wi-Fi locks so the tablet is always
   reachable. It wakes the screen on an incoming call or bell.
 - `CallManager`: listens on TCP 47555. A call connects to the other tablet and exchanges
-  one-line JSON messages (`hello` → `ok`, WebRTC `offer`/`answer`/`ice`, `bye`).
+  one-line JSON messages (`hello` → `ringing` → `ok` / `decline` / `noanswer`, WebRTC `offer`/`answer`/`ice`, `bye`).
   `ping`/`pong` every 20 s drives the "Online" indicator, and `bell` rings the other tablet.
   Audio/video is WebRTC, peer-to-peer on the LAN (no STUN/TURN). On a network hiccup the
   caller re-opens the socket (`resume`) and does an ICE restart; the call only ends if it

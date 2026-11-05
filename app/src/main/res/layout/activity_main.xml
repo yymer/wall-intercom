@@ -61,6 +61,19 @@
             android:gravity="center"
             android:orientation="vertical">
 
+            <!-- "… didn't answer" / "… can't answer right now" after an outgoing call -->
+            <TextView
+                android:id="@+id/callResult"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:gravity="center"
+                android:shadowColor="#CC000000"
+                android:shadowRadius="8"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:visibility="gone" />
+
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -151,20 +164,44 @@
             android:textColor="#FFFFFF"
             android:textSize="30sp" />
 
-        <Button
-            android:id="@+id/endBtn"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_end"
-            android:minWidth="320dp"
-            android:paddingStart="40dp"
-            android:paddingTop="28dp"
-            android:paddingEnd="40dp"
-            android:paddingBottom="28dp"
-            android:text="@string/end_call"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="34sp" />
+            android:orientation="horizontal">
+
+            <!-- Only shown while an incoming call is ringing -->
+            <Button
+                android:id="@+id/answerBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="32dp"
+                android:background="@drawable/bg_answer"
+                android:minWidth="320dp"
+                android:paddingStart="40dp"
+                android:paddingTop="28dp"
+                android:paddingEnd="40dp"
+                android:paddingBottom="28dp"
+                android:text="@string/answer"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="34sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/endBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_end"
+                android:minWidth="320dp"
+                android:paddingStart="40dp"
+                android:paddingTop="28dp"
+                android:paddingEnd="40dp"
+                android:paddingBottom="28dp"
+                android:text="@string/end_call"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="34sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <TextView

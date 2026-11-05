@@ -41,8 +41,11 @@ class MainActivity : Activity(), CallManager.Listener {
     private lateinit var callBtn: Button
     private lateinit var bellBtn: Button
     private lateinit var peerStatus: TextView
+    private lateinit var callResult: TextView
     private lateinit var callPanel: View
     private lateinit var callStatus: TextView
+    private lateinit var answerBtn: Button
+    private lateinit var endBtn: Button
     private lateinit var message: TextView
 
     private val handler = Handler(Looper.getMainLooper())
@@ -74,8 +77,11 @@ class MainActivity : Activity(), CallManager.Listener {
         callBtn = findViewById(R.id.callBtn)
         bellBtn = findViewById(R.id.bellBtn)
         peerStatus = findViewById(R.id.peerStatus)
+        callResult = findViewById(R.id.callResult)
         callPanel = findViewById(R.id.callPanel)
         callStatus = findViewById(R.id.callStatus)
+        answerBtn = findViewById(R.id.answerBtn)
+        endBtn = findViewById(R.id.endBtn)
         message = findViewById(R.id.message)
 
         val egl = CallManager.eglBase.eglBaseContext
@@ -104,7 +110,8 @@ class MainActivity : Activity(), CallManager.Listener {
                 else setBellRinging(false)
             }
         }
-        findViewById<Button>(R.id.endBtn).setOnClickListener { CallManager.hangup() }
+        answerBtn.setOnClickListener { CallManager.answer() }
+        endBtn.setOnClickListener { CallManager.hangup() } // declines while ringing
         val settingsBtn = findViewById<View>(R.id.settingsBtn)
         settingsBtn.setOnClickListener { showMessage(getString(R.string.hold_for_settings)) }
         settingsBtn.setOnLongClickListener {
@@ -167,12 +174,18 @@ class MainActivity : Activity(), CallManager.Listener {
 
     override fun onCallState(state: CallState, peer: String, info: String?) {
         val inCall = state != CallState.IDLE
-        val vis = if (inCall) View.VISIBLE else View.GONE
-        remoteView.visibility = vis
-        localView.visibility = vis
-        callPanel.visibility = vis
+        val ringingHere = state == CallState.INCOMING
+        // No video views while it's only ringing: nothing is being captured or shown yet.
+        val videoVis = if (inCall && !ringingHere) View.VISIBLE else View.GONE
+        remoteView.visibility = videoVis
+        localView.visibility = videoVis
+        callPanel.visibility = if (inCall) View.VISIBLE else View.GONE
+        answerBtn.visibility = if (ringingHere) View.VISIBLE else View.GONE
+        endBtn.setText(if (ringingHere) R.string.decline else R.string.end_call)
         callStatus.text = when (state) {
             CallState.DIALING -> getString(R.string.state_calling, peer)
+            CallState.RINGING -> getString(R.string.state_ringing, peer)
+            CallState.INCOMING -> getString(R.string.state_incoming)
             CallState.CONNECTING -> getString(R.string.state_connecting, peer)
             CallState.IN_CALL -> peer
             CallState.RECONNECTING -> getString(R.string.state_reconnecting)
@@ -186,7 +199,11 @@ class MainActivity : Activity(), CallManager.Listener {
             localView.clearImage()
             if (overlay.visibility != View.VISIBLE) setBrightness(false)
         }
-        if (info != null) showMessage(info)
+        if (info != null) {
+            // A missed call stays up longer so whoever walks by can call back.
+            val missed = info == getString(R.string.missed_call, peer)
+            showMessage(info, if (missed) 60_000 else 5_000)
+        }
     }
 
     override fun onPeerStatus(online: Boolean, peer: String) = updateCallButton()
@@ -200,6 +217,13 @@ class MainActivity : Activity(), CallManager.Listener {
         handler.removeCallbacks(hideOverlayRunnable)
         handler.postDelayed(hideOverlayRunnable, 60_000)
         showMessage(getString(R.string.bell_from, from), 60_000)
+    }
+
+    override fun onCallNotAnswered(info: String) {
+        if (CallManager.state != CallState.IDLE) return
+        showOverlay() // so they can try again or ring the bell
+        callResult.text = info
+        callResult.visibility = View.VISIBLE
     }
 
     private fun updateCallButton() {
@@ -238,6 +262,7 @@ class MainActivity : Activity(), CallManager.Listener {
         handler.removeCallbacks(hideOverlayRunnable)
         if (message.visibility == View.VISIBLE) message.visibility = View.GONE
         overlay.visibility = View.GONE
+        callResult.visibility = View.GONE
         hint.alpha = 1f
         if (CallManager.state == CallState.IDLE) setBrightness(false)
     }

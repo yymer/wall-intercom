@@ -58,4 +58,12 @@
     <string name="bell_from">🔔 Det plingar från %1$s</string>
     <string name="bell_volume">Volym för pling (%)</string>
     <string name="state_reconnecting">Återansluter…</string>
+    <string name="answer">Svara</string>
+    <string name="decline">Avvisa</string>
+    <string name="state_ringing">Det ringer hos %1$s…</string>
+    <string name="state_incoming">Inkommande samtal</string>
+    <string name="missed_call">Missat samtal från %1$s</string>
+    <string name="err_declined">%1$s kan inte svara just nu</string>
+    <string name="err_no_answer">%1$s svarade inte</string>
+    <string name="auto_answer">Svara automatiskt på samtal (kameran slås på utan att någon trycker på Svara)</string>
 </resources>

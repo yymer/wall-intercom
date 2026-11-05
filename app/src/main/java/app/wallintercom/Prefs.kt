@@ -41,6 +41,8 @@ class Prefs(ctx: Context) {
     var hdVideo: Boolean get() = bool("hdVideo", false); set(v) = put("hdVideo", v)
     var bellVolume: Int get() = int("bellVolume", 80); set(v) = put("bellVolume", v)
     var hwEcho: Boolean get() = bool("hwEcho", false); set(v) = put("hwEcho", v)
+    /** Off by default: someone in the room has to press Answer before the camera turns on. */
+    var autoAnswer: Boolean get() = bool("autoAnswer", false); set(v) = put("autoAnswer", v)
 
     fun isNight(hour: Int): Boolean {
         val s = nightStart
