@@ -116,4 +116,6 @@
     <string name="pair_request_title">%1$s wants to pair with this tablet</string>
     <string name="pair_request_msg">Code: %1$s\n\nOnly accept if %2$s shows the same code. Then %2$s can call and ring this tablet.</string>
     <string name="err_forgotten">%1$s doesn\'t know this tablet anymore. Touch the photo to pair again.</string>
+    <string name="rooms_all_offline">None of the other rooms is reachable right now.</string>
+    <string name="auto_start">Start automatically when the tablet is turned on (so it can take calls after a restart)</string>
 </resources>

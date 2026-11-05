@@ -115,4 +115,6 @@
     <string name="pair_request_title">%1$s vill paras ihop med den här surfplattan</string>
     <string name="pair_request_msg">Kod: %1$s\n\nGodkänn bara om %2$s visar samma kod. Sedan kan %2$s ringa och plinga den här surfplattan.</string>
     <string name="err_forgotten">%1$s känner inte igen den här surfplattan längre. Tryck på bilden för att para ihop igen.</string>
+    <string name="rooms_all_offline">Inget av de andra rummen går att nå just nu.</string>
+    <string name="auto_start">Starta automatiskt när surfplattan slås på (så att den kan ta emot samtal efter en omstart)</string>
 </resources>

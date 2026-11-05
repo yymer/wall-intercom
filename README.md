@@ -66,13 +66,16 @@ will refuse to install them over the old version.
    which the slideshow then shows. Sharing the same photo twice doesn't copy it again.
 3. Open **Wall Intercom**. Tap the screen, then **press and hold ⚙** (top right) for settings:
    - *Name of this room*, e.g. `Kitchen`.
+   - Tick *Start automatically when the tablet is turned on*, so it can take calls again after
+     a restart or power cut (off by default).
    - Optional: *Choose album…* to show a different album on the tablet instead (e.g. Camera),
      or *Other folder…* for any folder, e.g. on an SD card.
    - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*
      (Android 6 and newer; Android 5 doesn't have these).
    - **Save**.
-4. Press the tablet's Home button and choose **Wall Intercom → Always**. It is now the home
-   screen, so it comes back by itself after a reboot or if someone leaves it.
+4. Optional, for a dedicated wall tablet: press the Home button and choose **Wall Intercom →
+   Always**. It is then the home screen, so it also comes back if someone leaves it (and starts
+   after a reboot even without *Start automatically*).
 5. Android settings → *Security → Screen lock* → **None**, so calls aren't stuck behind the
    lock screen.
 6. Pair the tablets: touch the photo, and press **Call** or **Bell** next to a room marked
@@ -92,6 +95,7 @@ The port (default 47555) must be the same on both tablets.
 | Fill the whole screen | on | Crops pictures slightly instead of showing black bars |
 | Brightness while showing pictures | 40% | Full brightness when touched or in a call |
 | Night hours / night brightness | 22–07, 2% | 0% turns the backlight off; a touch, call or bell wakes it |
+| Start automatically | off | Starts the app when the tablet is turned on. On Android 10, showing the screen at boot also needs *Allow waking up over other apps*; without it only the call listener starts |
 | Answer calls automatically | off | When on, incoming calls connect without anyone pressing Answer |
 | Call volume | 80% | |
 | Bell volume | 80% | Plays on Android's *alarm* volume channel |

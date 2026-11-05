@@ -93,6 +93,12 @@ object CallManager {
     private const val BELL_FALLBACK_MS = 4_000L
     /** How long a pairing request waits for Accept here. */
     private const val PAIR_TIMEOUT_MS = 60_000L
+    /**
+     * A paired tablet not heard from for this long is really offline (turned off, out of range)
+     * and is hidden from the main screen until it's back. Shorter outages just show a grey dot.
+     * Pings run every 20 s, so this is about three missed pings.
+     */
+    private const val HIDE_OFFLINE_AFTER_MS = 60_000L
 
     interface Listener {
         fun onCallState(state: CallState, peer: String, info: String?)
@@ -143,6 +149,8 @@ object CallManager {
 
     /** Paired tablets that answered the last ping. */
     private val online = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    /** When each paired tablet last answered or connected to us. */
+    private val lastSeen = java.util.concurrent.ConcurrentHashMap<String, Long>()
     /** A pairing request waiting for Accept here: (name, code), for the activity on resume. */
     @Volatile
     var pairRequest: Pair<String, String>? = null
@@ -197,11 +205,18 @@ object CallManager {
 
     // ---------------------------------------------------------------- public API
 
-    /** Paired tablets first (in pairing order), then new ones found on the network. */
+    /**
+     * Paired tablets first (in pairing order), then new ones found on the network. Paired tablets
+     * that have been unreachable for a while are left out until they're back.
+     */
     fun rooms(): List<Room> {
         val peers = Peers.all()
         val found = Discovery.found()
-        val paired = peers.map { p ->
+        val now = System.currentTimeMillis()
+        val paired = peers.filter { p ->
+            val seen = maxOf(lastSeen[p.id] ?: 0L, found.firstOrNull { it.id == p.id }?.seen ?: 0L)
+            online[p.id] == true || now - seen < HIDE_OFFLINE_AFTER_MS
+        }.map { p ->
             Room(p.id, p.name, true, online[p.id] == true, p.ip ?: "", p.port)
         }
         val new = found.filter { f -> peers.none { it.id == f.id } }
@@ -382,6 +397,8 @@ object CallManager {
             if (ok) reply!!.optString("name").let { Peers.updateName(peer.id, it) }
             setOnline(peer.id, ok)
         }
+        // Rooms may have crossed the "really offline" line without their dot changing.
+        roomsChanged()
     }
 
     /** The other tablet doesn't know us anymore (reset or removed us): drop it here too. */
@@ -1098,6 +1115,7 @@ object CallManager {
     }
 
     private fun setOnline(peerId: String, isOnline: Boolean) {
+        if (isOnline) lastSeen[peerId] = System.currentTimeMillis()
         if (online.put(peerId, isOnline) != isOnline) roomsChanged()
     }
 

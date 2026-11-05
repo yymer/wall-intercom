@@ -98,9 +98,27 @@ class IntercomService : Service() {
     }
 }
 
+/** Starts the app when the tablet is turned on, if "Start automatically" is ticked in settings. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) IntercomService.start(context)
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != QUICKBOOT) return
+        if (!Prefs(context).autoStart) return
+        // The service first: it listens for calls even if Android doesn't let us show the screen.
+        IntercomService.start(context)
+        // Showing the photo screen from the background needs "Allow waking up over other apps"
+        // on Android 10+ (granted in settings); without it, only the service runs.
+        try {
+            context.startActivity(
+                Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            android.util.Log.w("BootReceiver", "can't open the app at boot: ${e.message}")
+        }
+    }
+
+    companion object {
+        /** Sent instead of BOOT_COMPLETED after a "fast boot" on some Lenovo/HTC tablets. */
+        const val QUICKBOOT = "android.intent.action.QUICKBOOT_POWERON"
     }
 }
 

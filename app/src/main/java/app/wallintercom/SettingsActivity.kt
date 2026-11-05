@@ -50,6 +50,7 @@ class SettingsActivity : Activity() {
         textField(R.string.my_name, prefs.myName) {
             prefs.myName = it.trim().ifEmpty { getString(R.string.default_my_name) }
         }
+        checkBox(R.string.auto_start, prefs.autoStart) { prefs.autoStart = it }
 
         heading(R.string.h_rooms)
         roomsCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }

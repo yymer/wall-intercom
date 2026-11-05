@@ -271,15 +271,19 @@ class MainActivity : Activity(), CallManager.Listener {
     /** Rooms whose bell button is showing "ringing". */
     private val ringingBells = HashSet<String>()
     private val bellButtons = HashMap<String, Button>()
+    /** Rooms that answered the last check; the others' buttons are disabled. */
+    private val onlineRooms = HashSet<String>()
 
     /** One row per room: name with an online dot, Call, Bell. New rooms pair first. */
     private fun rebuildRooms() {
         roomsList.removeAllViews()
         bellButtons.clear()
+        onlineRooms.clear()
         val rooms = CallManager.rooms()
         if (rooms.isEmpty()) {
             roomsList.addView(TextView(this).apply {
-                setText(R.string.rooms_searching)
+                // Paired rooms exist but none is on right now, or nothing paired/found yet.
+                setText(if (Peers.all().isNotEmpty()) R.string.rooms_all_offline else R.string.rooms_searching)
                 gravity = Gravity.CENTER
                 textSize = 20f
                 setTextColor(Color.WHITE)
@@ -311,7 +315,10 @@ class MainActivity : Activity(), CallManager.Listener {
                 minWidth = dp(200)
                 setPadding(0, 0, dp(20), 0)
             })
+            if (room.online) onlineRooms += room.id
             val call = roundButton(R.drawable.bg_call, R.drawable.ic_stat, R.string.call_button)
+            // Not reachable right now (grey dot): no calling or ringing until it's back.
+            call.setUsable(room.online, room.online)
             call.setOnClickListener {
                 if (room.paired) {
                     hideOverlay()
@@ -328,7 +335,7 @@ class MainActivity : Activity(), CallManager.Listener {
                 if (room.id in ringingBells) R.drawable.bg_bell_ringing else R.drawable.bg_bell,
                 R.drawable.ic_bell, R.string.bell_button,
             )
-            bell.isEnabled = room.id !in ringingBells
+            bell.setUsable(room.online && room.id !in ringingBells, room.online)
             bell.setOnClickListener {
                 if (room.paired) ringBell(room.id) else pairThen(room) { peer -> ringBell(peer.id) }
             }
@@ -376,9 +383,15 @@ class MainActivity : Activity(), CallManager.Listener {
     private fun setBellRinging(peerId: String, ringing: Boolean) {
         if (ringing) ringingBells += peerId else ringingBells -= peerId
         bellButtons[peerId]?.let {
-            it.isEnabled = !ringing
+            it.setUsable(!ringing && peerId in onlineRooms, peerId in onlineRooms)
             it.setBackgroundResource(if (ringing) R.drawable.bg_bell_ringing else R.drawable.bg_bell)
         }
+    }
+
+    /** Dimmed only when the room is offline; a ringing bell is just disabled, not dimmed. */
+    private fun Button.setUsable(enabled: Boolean, online: Boolean) {
+        isEnabled = enabled
+        alpha = if (online) 1f else 0.4f
     }
 
     private fun showOverlay() {
