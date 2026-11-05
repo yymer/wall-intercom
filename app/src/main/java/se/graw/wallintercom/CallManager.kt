@@ -1,4 +1,4 @@
-package app.wallintercom
+package se.graw.wallintercom
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -7,6 +7,7 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import org.json.JSONObject
 import org.webrtc.AudioSource
@@ -49,6 +50,9 @@ import kotlin.concurrent.thread
  */
 enum class CallState { IDLE, DIALING, RINGING, INCOMING, AUTO_ANSWERING, CONNECTING, IN_CALL, RECONNECTING }
 
+/** A pairing request whose key hasn't been revealed yet. */
+class PairStart(val me: Crypto.Pairing, val id: String, val name: String, val port: Int, val commit: String)
+
 /** Forwards video frames to whatever renderer is currently attached. */
 class ProxyVideoSink : VideoSink {
     @Volatile
@@ -72,7 +76,8 @@ class ProxyVideoSink : VideoSink {
  *   ping -> pong{name}            (short connection, for the "online" dots)
  *   bell -> bellok                (short connection, rings the bell on the other tablet)
  *   unpair -> (closed)            (the other tablet removed us)
- * An unpaired tablet may only send pair{…} (see [Link.pair]); someone here must press Accept.
+ * An unpaired tablet may only send pair{…} and reveal{…} (see [Link.pair]); someone here must
+ * press Accept.
  *
  * If the network hiccups during a call (ICE disconnected/failed or the signalling socket dies),
  * the call goes to RECONNECTING for up to [RECONNECT_GRACE_MS]. The caller re-opens the
@@ -93,6 +98,14 @@ object CallManager {
     private const val BELL_FALLBACK_MS = 4_000L
     /** How long a pairing request waits for Accept here. */
     private const val PAIR_TIMEOUT_MS = 60_000L
+    /** Pairing requests are refused for this long after one has been shown. */
+    private const val PAIR_COOLDOWN_MS = 15_000L
+    /** Pairing requests only show on screen, without the bell, until this long after the last ring. */
+    private const val PAIR_BELL_EVERY_MS = 5 * 60_000L
+    /** A connection must have proven who it is, or be showing a pairing request, by then. */
+    private const val HANDSHAKE_TIMEOUT_MS = 15_000L
+    private const val MAX_CONNECTIONS = 64
+    private const val MAX_CONNECTIONS_PER_ADDRESS = 8
     /**
      * A paired tablet not heard from for this long is really offline (turned off, out of range)
      * and is hidden from the main screen until it's back. Shorter outages just show a grey dot.
@@ -151,11 +164,19 @@ object CallManager {
     private val online = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
     /** When each paired tablet last answered or connected to us. */
     private val lastSeen = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    /** Paired tablets that said they don't know us anymore, see [forgotten]. */
+    private val forgottenBy: MutableSet<String> =
+        java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
     /** A pairing request waiting for Accept here: (name, code), for the activity on resume. */
     @Volatile
     var pairRequest: Pair<String, String>? = null
         private set
     private var pendingPair: PendingPair? = null
+    /** When a pairing request was last shown, and last rang the bell (elapsed time). */
+    private var lastPairShown: Long? = null
+    private var lastPairBell: Long? = null
+    /** Open incoming connections per remote address. Guarded by itself. */
+    private val incoming = HashMap<String, Int>()
 
     val localSink = ProxyVideoSink()
     val remoteSink = ProxyVideoSink()
@@ -215,11 +236,11 @@ object CallManager {
         val now = System.currentTimeMillis()
         val paired = peers.filter { p ->
             val seen = maxOf(lastSeen[p.id] ?: 0L, found.firstOrNull { it.id == p.id }?.seen ?: 0L)
-            online[p.id] == true || now - seen < HIDE_OFFLINE_AFTER_MS
+            p.id !in forgottenBy && (online[p.id] == true || now - seen < HIDE_OFFLINE_AFTER_MS)
         }.map { p ->
             Room(p.id, p.name, true, online[p.id] == true, p.ip ?: "", p.port)
         }
-        val new = found.filter { f -> peers.none { it.id == f.id } }
+        val new = found.filter { f -> f.id in forgottenBy || peers.none { it.id == f.id } }
             .sortedBy { it.name }
             .map { Room(it.id, it.name.ifBlank { it.ip }, false, true, it.ip, it.port) }
         return paired + new
@@ -316,6 +337,7 @@ object CallManager {
         val peer = Peers.get(peerId) ?: return
         Log.i(TAG, "removing ${peer.name}")
         Peers.remove(peerId)
+        forgottenBy.remove(peerId)
         online.remove(peerId)
         roomsChanged()
         // Uses the copy: it still has the key needed to prove it's us.
@@ -360,12 +382,7 @@ object CallManager {
                     ss.bind(InetSocketAddress(prefs.port))
                     serverSocket = ss
                     Log.i(TAG, "listening on ${prefs.port}")
-                    while (!ss.isClosed) {
-                        val s = ss.accept()
-                        s.tcpNoDelay = true
-                        s.keepAlive = true
-                        newConn(s).start()
-                    }
+                    while (!ss.isClosed) acceptOne(ss.accept())
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "listener: ${e.message}")
@@ -375,10 +392,61 @@ object CallManager {
         }
     }
 
-    private fun newConn(s: Socket, reader: java.io.BufferedReader? = null) = Conn(
+    /** Starts handling a new incoming connection. A bad one must not stop the listener. */
+    private fun acceptOne(s: Socket) {
+        val address = s.inetAddress?.hostAddress ?: "?"
+        if (!reserveIncoming(address)) {
+            Log.w(TAG, "too many connections, refusing $address")
+            closeQuietly(s)
+            return
+        }
+        try {
+            s.tcpNoDelay = true
+            s.keepAlive = true
+            val c = newConn(s, onEnd = { releaseIncoming(address) }).start()
+            timers.schedule({
+                exec.execute {
+                    if (!c.closed && c.peerId == null && pendingPair?.c !== c) {
+                        Log.w(TAG, "$address didn't finish the handshake in time")
+                        c.close()
+                    }
+                }
+            }, HANDSHAKE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        } catch (e: Exception) {
+            Log.w(TAG, "can't handle connection from $address: ${e.message}")
+            releaseIncoming(address)
+            closeQuietly(s)
+        }
+    }
+
+    private fun reserveIncoming(address: String): Boolean = synchronized(incoming) {
+        val here = incoming[address] ?: 0
+        if (here >= MAX_CONNECTIONS_PER_ADDRESS || incoming.values.sum() >= MAX_CONNECTIONS) return false
+        incoming[address] = here + 1
+        true
+    }
+
+    private fun releaseIncoming(address: String) {
+        synchronized(incoming) {
+            val left = (incoming[address] ?: 0) - 1
+            if (left > 0) incoming[address] = left else incoming.remove(address)
+        }
+    }
+
+    private fun closeQuietly(s: Socket) {
+        try {
+            s.close()
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun newConn(s: Socket, reader: LineReader? = null, onEnd: (() -> Unit)? = null) = Conn(
         s,
         onMessage = { c, m -> exec.execute { onMessage(c, m) } },
-        onClosed = { c -> exec.execute { onClosed(c) } },
+        onClosed = { c ->
+            onEnd?.invoke()
+            exec.execute { onClosed(c) }
+        },
         reader = reader,
     )
 
@@ -401,10 +469,14 @@ object CallManager {
         roomsChanged()
     }
 
-    /** The other tablet doesn't know us anymore (reset or removed us): drop it here too. */
+    /**
+     * The other tablet says it doesn't know us anymore (reset or removed us). It can't sign that
+     * without the key, so anyone could be saying it: show it as a new room to pair with again, but
+     * keep the key, in case the next proper connection shows that it still knows us.
+     */
     private fun forgotten(peer: Peer) {
-        Log.i(TAG, "${peer.name} doesn't know this tablet anymore, removing it")
-        Peers.remove(peer.id)
+        Log.i(TAG, "${peer.name} says it doesn't know this tablet anymore")
+        forgottenBy.add(peer.id)
         online.remove(peer.id)
         roomsChanged()
     }
@@ -437,6 +509,7 @@ object CallManager {
                 Log.i(TAG, "${peer.name} removed this tablet")
                 c.close()
                 Peers.remove(peer.id)
+                forgottenBy.remove(peer.id)
                 online.remove(peer.id)
                 roomsChanged()
             }
@@ -476,6 +549,7 @@ object CallManager {
                 setOnline(p.id, true)
             }
             "pair" -> onPairRequest(c, m)
+            "reveal" -> onPairReveal(c, m)
             else -> {
                 Log.w(TAG, "ignoring unauthenticated '${m.optString("t")}' from ${c.remoteAddress?.hostAddress}")
                 c.close()
@@ -485,34 +559,64 @@ object CallManager {
 
     // ---------------------------------------------------------------- pairing (this side)
 
+    /** Why a pairing request can't be shown right now, as sent to the other tablet. */
+    private fun pairRefusal(): String? {
+        val shown = lastPairShown
+        return when {
+            state != CallState.IDLE -> "busy"
+            pendingPair != null -> "pairing"
+            shown != null && SystemClock.elapsedRealtime() - shown < PAIR_COOLDOWN_MS -> "pairing"
+            else -> null
+        }
+    }
+
+    private fun refusePairing(c: Conn, why: String) {
+        c.send(msg("pairno").put("why", why))
+        c.close()
+    }
+
+    /** First step of pairing: nothing shows here until the other tablet has revealed its key. */
     private fun onPairRequest(c: Conn, m: JSONObject) {
         val id = m.optString("id")
         val name = m.optString("name").take(60).ifBlank { c.remoteAddress?.hostAddress ?: "?" }
+        val commit = m.optString("commit")
+        if (m.optInt("v") != Link.PROTOCOL) return refusePairing(c, "version")
+        if (id.isBlank() || commit.isBlank() || id == prefs.deviceId || c.pairStart != null) return c.close()
+        pairRefusal()?.let { return refusePairing(c, it) }
+        val me = Crypto.Pairing()
+        c.pairStart = PairStart(me, id, name, m.optInt("port", prefs.port), commit)
+        c.send(msg("pairwait").put("id", prefs.deviceId).put("name", prefs.myName).put("pub", me.publicKey))
+    }
+
+    /** The other tablet's key: both tablets can now work out the code. */
+    private fun onPairReveal(c: Conn, m: JSONObject) {
+        val start = c.pairStart ?: return c.close()
+        c.pairStart = null
         val pub = m.optString("pub")
-        when {
-            id.isBlank() || pub.isBlank() || id == prefs.deviceId -> return c.close()
-            state != CallState.IDLE -> {
-                c.send(msg("pairno").put("why", "busy")); c.close(); return
-            }
-            pendingPair != null -> {
-                c.send(msg("pairno").put("why", "pairing")); c.close(); return
-            }
+        if (!Crypto.same(start.commit, Crypto.commitment(pub))) {
+            Log.w(TAG, "pairing key from ${c.remoteAddress?.hostAddress} doesn't match what it promised")
+            return c.close()
         }
+        pairRefusal()?.let { return refusePairing(c, it) }
         val res = try {
-            val me = Crypto.Pairing()
-            val r = me.finish(prefs.deviceId, id, pub)
-            c.send(msg("pairwait").put("id", prefs.deviceId).put("name", prefs.myName).put("pub", me.publicKey))
-            r
+            start.me.finish(prefs.deviceId, start.id, pub)
         } catch (e: Exception) {
             Log.w(TAG, "bad pairing request", e)
             c.close()
             return
         }
-        Log.i(TAG, "pairing request from $name, code ${res.code}")
-        val p = PendingPair(c, id, name, m.optInt("port", prefs.port), res.key, res.code)
+        val name = start.name
+        Log.i(TAG, "pairing request from $name")
+        val p = PendingPair(c, start.id, name, start.port, res.key, res.code)
         pendingPair = p
         pairRequest = name to res.code
-        playBell()
+        val now = SystemClock.elapsedRealtime()
+        lastPairShown = now
+        val rang = lastPairBell
+        if (rang == null || now - rang >= PAIR_BELL_EVERY_MS) {
+            lastPairBell = now
+            playBell()
+        }
         main.post {
             onWakeUp?.invoke()
             listener?.onPairRequest(name, res.code)
@@ -1115,7 +1219,11 @@ object CallManager {
     }
 
     private fun setOnline(peerId: String, isOnline: Boolean) {
-        if (isOnline) lastSeen[peerId] = System.currentTimeMillis()
+        if (isOnline) {
+            lastSeen[peerId] = System.currentTimeMillis()
+            // Only set after a connection that proved the pair key.
+            if (forgottenBy.remove(peerId)) roomsChanged()
+        }
         if (online.put(peerId, isOnline) != isOnline) roomsChanged()
     }
 

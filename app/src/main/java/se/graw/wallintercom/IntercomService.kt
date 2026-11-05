@@ -1,4 +1,4 @@
-package app.wallintercom
+package se.graw.wallintercom
 
 import android.app.Notification
 import android.app.NotificationChannel

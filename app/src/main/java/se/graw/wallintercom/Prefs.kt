@@ -1,4 +1,4 @@
-package app.wallintercom
+package se.graw.wallintercom
 
 import android.content.Context
 import android.os.Build
@@ -61,7 +61,7 @@ class Prefs(ctx: Context) {
      * enabled state of the HomeScreen alias in the manifest, not in these settings.
      */
     object HomeScreen {
-        private fun component(ctx: Context) = android.content.ComponentName(ctx, "app.wallintercom.HomeScreen")
+        private fun component(ctx: Context) = android.content.ComponentName(ctx, "se.graw.wallintercom.HomeScreen")
 
         fun isEnabled(ctx: Context) = ctx.packageManager.getComponentEnabledSetting(component(ctx)) ==
             android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED

@@ -1,4 +1,4 @@
-package app.wallintercom
+package se.graw.wallintercom
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -64,6 +64,7 @@ object PairingDialogs {
                     Link.PairFailure.BUSY -> act.getString(R.string.pair_busy, n)
                     Link.PairFailure.ALREADY_PAIRING -> act.getString(R.string.pair_already, n)
                     Link.PairFailure.TIMEOUT -> act.getString(R.string.pair_timeout, n)
+                    Link.PairFailure.VERSION -> act.getString(R.string.pair_version, n)
                 }
                 if (!act.isFinishing) {
                     AlertDialog.Builder(act).setMessage(text).setPositiveButton(R.string.ok, null).show().bigText()

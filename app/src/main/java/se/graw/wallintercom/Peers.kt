@@ -1,4 +1,4 @@
-package app.wallintercom
+package se.graw.wallintercom
 
 import android.content.Context
 import android.util.Base64
@@ -105,10 +105,20 @@ object Crypto {
     /** Constant-time comparison of two base64 MACs. */
     fun same(a: String, b: String) = MessageDigest.isEqual(a.toByteArray(), b.toByteArray())
 
+    /** What the tablet asking to pair sends before it has seen the other tablet's public key. */
+    fun commitment(publicKey: String): String = b64(
+        MessageDigest.getInstance("SHA-256").digest("wall-intercom pair commit\u0000$publicKey".toByteArray(Charsets.UTF_8))
+    )
+
     /**
      * One side of a pairing: an ephemeral elliptic-curve key pair. Both tablets combine their own
      * private key with the other's public key into the same secret (ECDH). Someone in the middle
      * would end up with a different secret on each side, and so a different code on each screen.
+     *
+     * The code is short, so each key must be fixed before its effect on the code can be known:
+     * otherwise someone in the middle could try keys until the two codes happen to match. That's
+     * why the tablet asking to pair first sends only a [commitment] to its key, and reveals the
+     * key after it has received the other tablet's. See [Link] for the order of the messages.
      */
     class Pairing {
         private val kp = KeyPairGenerator.getInstance("EC").apply {

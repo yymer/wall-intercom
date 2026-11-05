@@ -1,9 +1,7 @@
-package app.wallintercom
+package se.graw.wallintercom
 
 import org.json.JSONObject
-import java.io.BufferedReader
 import java.io.BufferedWriter
-import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.Socket
 import kotlin.concurrent.thread
@@ -19,7 +17,7 @@ class Conn(
     private val onMessage: (Conn, JSONObject) -> Unit,
     private val onClosed: (Conn) -> Unit,
     /** An existing reader, if the handshake already read from this socket. */
-    private val reader: BufferedReader? = null,
+    private val reader: LineReader? = null,
 ) {
     /** Set once both sides proved they share the pair key. */
     @Volatile
@@ -29,6 +27,8 @@ class Conn(
     var peerId: String? = null
     /** Server side, between auth and proof: (peer id, client nonce, server nonce). */
     var pendingAuth: Triple<String, String, String>? = null
+    /** Server side, between pair and reveal. Only touched on CallManager's thread. */
+    var pairStart: PairStart? = null
 
     private val out = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8))
 
@@ -42,10 +42,10 @@ class Conn(
     fun start(): Conn {
         thread(name = "intercom-conn", isDaemon = true) {
             try {
-                val r = reader ?: BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
+                val r = reader ?: LineReader(socket.getInputStream())
                 while (true) {
                     val line = r.readLine() ?: break
-                    if (line.isNotBlank()) onMessage(this, JSONObject(line))
+                    if (line.isNotBlank()) onMessage(this, LineReader.parseJson(line))
                 }
             } catch (_: Exception) {
             }

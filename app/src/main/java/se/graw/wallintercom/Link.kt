@@ -1,9 +1,7 @@
-package app.wallintercom
+package se.graw.wallintercom
 
 import android.util.Log
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.net.Socket
 
@@ -16,14 +14,16 @@ import java.net.Socket
  *   client -> proof{h}                   ...then signed messages both ways
  *
  * Pairing with a new tablet (no key yet):
- *   client -> pair{id,name,port,pub}     server -> pairwait{id,name,pub}  (both show the code)
- *                                        server -> pairok | pairno{why}   (after Accept/Decline)
+ *   client -> pair{id,name,port,commit,v}  server -> pairwait{id,name,pub}
+ *   client -> reveal{pub}                  (both now show the code; [Crypto.Pairing] says why the
+ *                                           client's key is only revealed at this point)
+ *                                          server -> pairok | pairno{why}  (after Accept/Decline)
  */
 object Link {
     private const val TAG = "Link"
-    const val PROTOCOL = 2
+    const val PROTOCOL = 3
 
-    class Opened(val socket: Socket, val reader: BufferedReader, val session: Session, val peer: Peer) {
+    class Opened(val socket: Socket, val reader: LineReader, val session: Session, val peer: Peer) {
         fun send(m: JSONObject) {
             val out = socket.getOutputStream()
             out.write((session.wrap(m).toString() + "\n").toByteArray(Charsets.UTF_8))
@@ -31,7 +31,7 @@ object Link {
         }
 
         /** Next message, or null if the connection ended or a message was forged. */
-        fun read(): JSONObject? = reader.readLine()?.let { session.unwrap(JSONObject(it)) }
+        fun read(): JSONObject? = reader.readJson()?.let { session.unwrap(it) }
 
         fun close() = try {
             socket.close()
@@ -68,7 +68,7 @@ object Link {
             s.tcpNoDelay = true
             s.keepAlive = true
             s.soTimeout = 5000
-            val r = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
+            val r = LineReader(s.getInputStream())
             val out = s.getOutputStream()
             fun raw(m: JSONObject) {
                 out.write((m.toString() + "\n").toByteArray(Charsets.UTF_8))
@@ -76,7 +76,7 @@ object Link {
             }
             val nc = Crypto.nonce()
             raw(JSONObject().put("t", "auth").put("id", prefs.deviceId).put("n", nc).put("v", PROTOCOL))
-            val chal = JSONObject(r.readLine() ?: throw Exception("closed"))
+            val chal = r.readJson() ?: throw Exception("closed")
             when (chal.optString("t")) {
                 "unknown" -> {
                     s.close()
@@ -133,7 +133,7 @@ object Link {
         fun onFailed(why: PairFailure, name: String?)
     }
 
-    enum class PairFailure { UNREACHABLE, DECLINED, BUSY, TIMEOUT, ALREADY_PAIRING }
+    enum class PairFailure { UNREACHABLE, DECLINED, BUSY, TIMEOUT, ALREADY_PAIRING, VERSION }
 
     class Pairing(private val socket: Socket) {
         @Volatile
@@ -158,25 +158,30 @@ object Link {
             try {
                 s.connect(InetSocketAddress(ip, port), 4000)
                 s.soTimeout = 8000
-                val r = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
+                val r = LineReader(s.getInputStream())
                 val out = s.getOutputStream()
+                fun raw(m: JSONObject) {
+                    out.write((m.toString() + "\n").toByteArray(Charsets.UTF_8))
+                    out.flush()
+                }
                 val me = Crypto.Pairing()
-                val req = JSONObject().put("t", "pair").put("id", prefs.deviceId).put("name", prefs.myName)
-                    .put("port", prefs.port).put("pub", me.publicKey).put("v", PROTOCOL)
-                out.write((req.toString() + "\n").toByteArray(Charsets.UTF_8))
-                out.flush()
-                val wait = JSONObject(r.readLine() ?: throw Exception("closed"))
+                raw(
+                    JSONObject().put("t", "pair").put("id", prefs.deviceId).put("name", prefs.myName)
+                        .put("port", prefs.port).put("commit", Crypto.commitment(me.publicKey)).put("v", PROTOCOL)
+                )
+                val wait = r.readJson() ?: throw Exception("closed")
                 if (wait.optString("t") == "pairno") {
                     l.onFailed(failure(wait), null)
                     return@Thread
                 }
                 if (wait.optString("t") != "pairwait") throw Exception("unexpected ${wait.optString("t")}")
                 val id = wait.getString("id")
-                name = wait.optString("name").ifBlank { ip }
+                name = wait.optString("name").take(60).ifBlank { ip }
                 val res = me.finish(prefs.deviceId, id, wait.getString("pub"))
+                raw(JSONObject().put("t", "reveal").put("pub", me.publicKey))
                 l.onCode(name, res.code)
                 s.soTimeout = 75_000 // the other tablet gives up after 60 s
-                val answer = JSONObject(r.readLine() ?: throw Exception("closed"))
+                val answer = r.readJson() ?: throw Exception("closed")
                 if (answer.optString("t") == "pairok") {
                     val peer = Peer(id, name, res.key, ip, port)
                     Peers.put(peer)
@@ -204,6 +209,7 @@ object Link {
         "busy" -> PairFailure.BUSY
         "pairing" -> PairFailure.ALREADY_PAIRING
         "timeout" -> PairFailure.TIMEOUT
+        "version" -> PairFailure.VERSION
         else -> PairFailure.DECLINED
     }
 }

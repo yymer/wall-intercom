@@ -112,6 +112,7 @@
     <string name="pair_busy">%1$s är upptagen just nu. Försök igen om en stund.</string>
     <string name="pair_already">%1$s håller redan på att paras ihop med en annan surfplatta. Försök igen om en stund.</string>
     <string name="pair_timeout">Ingen vid %1$s godkände i tid.</string>
+    <string name="pair_version">%1$s har en annan version av Wall Intercom. Uppdatera appen på båda surfplattorna.</string>
     <string name="pair_request_title">%1$s vill paras ihop med den här surfplattan</string>
     <string name="pair_request_msg">Kod: %1$s\n\nGodkänn bara om %2$s visar samma kod. Sedan kan %2$s ringa och plinga den här surfplattan.</string>
     <string name="err_forgotten">%1$s känner inte igen den här surfplattan längre. Tryck på bilden för att para ihop igen.</string>

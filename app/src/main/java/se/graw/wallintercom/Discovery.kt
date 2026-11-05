@@ -1,4 +1,4 @@
-package app.wallintercom
+package se.graw.wallintercom
 
 import android.util.Log
 import org.json.JSONObject
@@ -26,6 +26,7 @@ object Discovery {
     private const val ANNOUNCE_EVERY_S = 60L
     /** Tablets not heard from for this long are dropped from the "new rooms" list. */
     private const val FORGET_AFTER_MS = 3 * 60_000L
+    private const val MAX_FOUND = 64
 
     data class Found(val id: String, val name: String, val ip: String, val port: Int, val seen: Long)
 
@@ -130,15 +131,15 @@ object Discovery {
     private fun record(id: String, name: String, ip: String, port: Int) {
         val f = Found(id, name, ip, port, System.currentTimeMillis())
         val changed = synchronized(found) {
+            // Announcements are free to fake: don't let them fill up the memory and the screen.
+            if (found.size >= MAX_FOUND && id !in found && Peers.get(id) == null) return
             val old = found.put(id, f)
             (found as Object).notifyAll()
             old == null || old.ip != ip || old.name != name || old.port != port
         }
-        // Keep paired tablets' addresses (and names) up to date.
-        if (Peers.get(id) != null) {
-            Peers.updateAddress(id, ip, port)
-            Peers.updateName(id, name)
-        }
+        // Keep paired tablets' addresses up to date. Their names come from the signed ping replies,
+        // since anyone can send an announcement.
+        if (Peers.get(id) != null) Peers.updateAddress(id, ip, port)
         if (changed) onChange?.invoke()
     }
 

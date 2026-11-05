@@ -113,6 +113,7 @@
     <string name="pair_busy">%1$s is busy right now. Try again in a moment.</string>
     <string name="pair_already">%1$s is already pairing with another tablet. Try again in a moment.</string>
     <string name="pair_timeout">Nobody at %1$s accepted in time.</string>
+    <string name="pair_version">%1$s has a different version of Wall Intercom. Update the app on both tablets.</string>
     <string name="pair_request_title">%1$s wants to pair with this tablet</string>
     <string name="pair_request_msg">Code: %1$s\n\nOnly accept if %2$s shows the same code. Then %2$s can call and ring this tablet.</string>
     <string name="err_forgotten">%1$s doesn\'t know this tablet anymore. Touch the photo to pair again.</string>

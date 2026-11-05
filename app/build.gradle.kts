@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -5,18 +6,45 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// The only place to change for a new version; versionCode follows (1.2.3 -> 10203).
+val appVersion = "1.0.0"
+val appVersionCode = appVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
+    major * 10_000 + minor * 100 + patch
+}
+
+// Signing key for releases, kept out of git (see "Publishing a release" in the README).
+val keystoreFile = rootProject.file("keystore.properties")
+val keystore = Properties().apply { if (keystoreFile.exists()) keystoreFile.inputStream().use(::load) }
+
 android {
-    namespace = "app.wallintercom"
+    namespace = "se.graw.wallintercom"
     compileSdk = 35
 
+    signingConfigs {
+        if (keystoreFile.exists()) {
+            create("release") {
+                storeFile = rootProject.file(keystore.getProperty("storeFile"))
+                storePassword = keystore.getProperty("storePassword")
+                keyAlias = keystore.getProperty("keyAlias")
+                keyPassword = keystore.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
+
     defaultConfig {
-        applicationId = "app.wallintercom"
+        applicationId = "se.graw.wallintercom"
         // Android 5.0 and newer (the WebRTC library's minimum).
         minSdk = 21
         // Sideloaded, never on the Play Store, so keep Android 10 behaviour.
         targetSdk = 29
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersion
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
             // ./build.sh -Pemulator  -> also include x86_64 for testing in the emulator

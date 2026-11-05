@@ -28,7 +28,8 @@ and talk directly to each other.
 - English and Swedish, following each tablet's language setting.
 
 Tested on two Lenovo Tab M10 (TB-X505F) running Android 10 and a Lenovo Tab 3 7" (TB3-710F)
-running Android 5.0.1.
+running Android 5.0.1. Newer Android versions should work but haven't been tested yet; please
+open an issue with how it goes on yours.
 
 | Touch the photo: Call and Bell | Bell ringing on the other tablet | The other tablet got the bell |
 |---|---|---|
@@ -40,28 +41,21 @@ running Android 5.0.1.
 
 - Two Android tablets with **Android 5.0 or newer** and a front camera. Very old tablets may
   struggle with HD video; the default 640×480 is the safe choice.
-- Both on the **same network**. Give each a fixed IP address (a DHCP reservation in your router).
-- A computer with `adb` to install the app (and JDK 17/21 + Android SDK if you build it yourself).
-
-## Build
-
-```bash
-./build.sh             # -> wall-intercom.apk (ARM, for real tablets)
-./build.sh -Pemulator  # also includes x86_64, for testing in the Android emulator
-```
-
-`build.sh` uses `JAVA_HOME` and `ANDROID_HOME` if set (JDK 17 or 21; Android SDK with
-platform 35). The APK is signed with your local debug key, which is fine for sideloading.
-Keep using the same machine (same `~/.android/debug.keystore`) to build updates, or Android
-will refuse to install them over the old version.
+- Both on the **same network**, and one that lets devices talk to each other (see
+  [Troubleshooting](#troubleshooting)).
 
 ## Set up each tablet
 
-1. Enable *Developer options → USB debugging* on the tablet, plug it in, then:
+1. Install the app: download `wall-intercom-<version>.apk` from the
+   [latest release](https://github.com/yymer/wall-intercom/releases/latest) on the tablet and
+   open it. Android asks you to allow installing from your browser, and may warn about an app
+   from outside the Play Store or made for an older Android version. Open Wall Intercom and
+   allow the camera, microphone and photos when it asks.
+
+   Or from a computer with USB debugging on the tablet (`-g` grants the permissions up front):
    ```bash
-   adb install -r -g wall-intercom.apk
+   adb install -r -g wall-intercom-<version>.apk
    ```
-   (`-g` grants camera, microphone and photo access up front.)
 2. Add photos: select them in Google Photos, Files or any other app → **Share** →
    **Wall Intercom**. They're copied into the album *Wall Intercom* (`Pictures/Wall Intercom`),
    which the slideshow then shows. Sharing the same photo twice doesn't copy it again.
@@ -148,10 +142,22 @@ which tells the room the camera just turned on.
   Pairing creates a secret key only those two tablets know (ECDH key exchange); every
   connection proves it, and every message is signed, so nobody else on the network can call,
   ring or tamper with a call. The signalling isn't encrypted, as it contains nothing secret.
-- Anyone on the same network can *ask* to pair, which shows a request on the tablet. Remove a
+- **Compare the code before pressing Accept.** Each tablet commits to its key before seeing the
+  other's, so someone intercepting the pairing can't try keys until the codes match; they get
+  one guess at a 4-digit code (1 in 10,000) per attempt.
+- Anyone on the same network can *ask* to pair, which shows a request on the tablet and wakes
+  its screen. Requests are limited to one per 15 s, and only ring the bell once per 5 minutes.
+  Never accept one you didn't start: the name it shows is chosen by whoever sent it. Remove a
   room in *Settings → Rooms*; the other tablet forgets this one too.
+- Devices that aren't paired can't do much else: connections have size and time limits. Someone
+  on your network can still disturb it (a flood of traffic can block calls, as with any device
+  on the network), so this is meant for a network you trust, not a public or guest Wi-Fi.
 - Audio and video are encrypted by WebRTC (DTLS-SRTP) and go directly between the tablets.
   Nothing leaves your network.
+
+Found a security problem? Please report it privately through
+[GitHub's vulnerability reporting](https://github.com/yymer/wall-intercom/security/advisories/new)
+rather than in a public issue.
 
 ## Optional: full kiosk lock-down
 
@@ -160,7 +166,7 @@ To make it impossible to leave the app (no status bar, no recent apps), make it
 (remove them first, or do it right after a factory reset):
 
 ```bash
-adb shell dpm set-device-owner app.wallintercom/.AdminReceiver
+adb shell dpm set-device-owner se.graw.wallintercom/.AdminReceiver
 ```
 
 The app then pins itself on screen and disables the lock screen. The *Open Android settings*
@@ -179,6 +185,9 @@ adb logcat -d | grep CallManager
   are on the same network and use the same port. Some routers block the discovery broadcasts:
   pair with *Add room by IP address…* instead. Some routers have "client/AP isolation" turned on for Wi-Fi, which
   blocks devices from talking to each other.
+- **A paired room shows up as *new* again**: that tablet says it no longer knows this one (it
+  was reset, or removed this one while it couldn't tell). Press Call or Bell to pair again.
+- **"Already pairing" right after a declined or cancelled request**: wait 15 s and try again.
 - **Echo or noise**: turn off Dolby/sound enhancements, lower *Call volume*, or try the
   *built-in echo cancellation* setting.
 - **App stops answering after a while**: press *Don't let Android put this app to sleep* in
@@ -190,9 +199,10 @@ adb logcat -d | grep CallManager
   reachable. It wakes the screen on an incoming call or bell.
 - `Discovery`: UDP broadcasts on port 47555 (`who` / `here`) so tablets find each other and
   keep track of each other's current IP address.
-- `Peers` / `Link`: pairing (ECDH, 4-digit comparison code, `pair` → `pairwait` →
-  `pairok`/`pairno`), the stored pair keys, and authenticated connections (`auth` → `chal` →
-  `proof`, then every message carries a sequence number and HMAC).
+- `Peers` / `Link`: pairing (ECDH, 4-digit comparison code, `pair` with a hash of the key →
+  `pairwait` → `reveal` of the key → `pairok`/`pairno`), the stored pair keys, and authenticated
+  connections (`auth` → `chal` → `proof`, then every message carries a sequence number and HMAC).
+- `LineReader`: reads messages from the network, with a size limit on each.
 - `CallManager`: listens on TCP 47555. A call connects to the other tablet and exchanges
   signed one-line JSON messages (`hello` → `ringing` → `ok` / `decline` / `noanswer`, WebRTC
   `offer`/`answer`/`ice`, `bye`). `ping`/`pong` every 20 s drives the online dots, and `bell`
@@ -208,6 +218,45 @@ adb logcat -d | grep CallManager
 - `SettingsActivity`: the settings form.
 - Translations are in `app/src/main/res/values*/strings.xml`. To add a language, copy
   `values/strings.xml` to `values-xx/` and translate it.
+
+## Build it yourself
+
+You need JDK 17 or 21 and the Android SDK with platform 35. `build.sh` uses `JAVA_HOME` and
+`ANDROID_HOME` if set.
+
+```bash
+./build.sh             # -> wall-intercom.apk (ARM, for real tablets)
+./build.sh -Pemulator  # also includes x86_64, for testing in the Android emulator
+```
+
+These are debug builds, signed with your machine's debug key. Android only installs an update
+signed with the same key as the installed app, so to switch between your own builds and the
+published ones, uninstall first. That removes the tablet's pairings, so they need pairing again.
+
+## Publishing a release
+
+For maintainers. Create a signing key once:
+
+```bash
+keytool -genkeypair -keystore ~/wall-intercom-release.jks -alias wall-intercom \
+  -keyalg RSA -keysize 4096 -validity 10000
+```
+
+**Back up the key and its password somewhere safe.** Without them, nobody can get updates
+without uninstalling the app and pairing their tablets again. Don't commit them.
+
+Next to `build.sh`, create `keystore.properties` (git ignores it):
+
+```properties
+storeFile=/home/you/wall-intercom-release.jks
+storePassword=...
+keyAlias=wall-intercom
+keyPassword=...
+```
+
+For each release, set `appVersion` at the top of `app/build.gradle.kts` (the `versionCode`
+follows from it), run `./build.sh release`, then tag the commit and attach
+`wall-intercom-<version>.apk` and its `.sha256` file to a GitHub release.
 
 ## License
 
