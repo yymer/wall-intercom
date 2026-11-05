@@ -45,8 +45,9 @@ import kotlin.concurrent.thread
  * DIALING: we called, waiting for the other tablet to respond.
  * RINGING: we called, the other tablet is ringing (waiting for someone there to answer).
  * INCOMING: the other tablet is calling us; camera/mic stay off until someone presses Answer.
+ * AUTO_ANSWERING: auto-answer is on; the bell is playing and the call starts when it ends.
  */
-enum class CallState { IDLE, DIALING, RINGING, INCOMING, CONNECTING, IN_CALL, RECONNECTING }
+enum class CallState { IDLE, DIALING, RINGING, INCOMING, AUTO_ANSWERING, CONNECTING, IN_CALL, RECONNECTING }
 
 /** Forwards video frames to whatever renderer is currently attached. */
 class ProxyVideoSink : VideoSink {
@@ -85,6 +86,8 @@ object CallManager {
     /** How long an incoming call rings before it counts as missed. */
     private const val RING_TIMEOUT_MS = 45_000L
     private const val RING_REPEAT_MS = 4_000L
+    /** A bit longer than the bell sound (2.6 s). */
+    private const val BELL_FALLBACK_MS = 4_000L
 
     interface Listener {
         fun onCallState(state: CallState, peer: String, info: String?)
@@ -349,7 +352,7 @@ object CallManager {
 
     private fun onHello(c: Conn, from: String, sid: String) {
         when {
-            state == CallState.IDLE -> if (prefs.autoAnswer) accept(c, from, sid) else ring(c, from, sid)
+            state == CallState.IDLE -> if (prefs.autoAnswer) autoAnswer(c, from, sid) else ring(c, from, sid)
             // The other tablet gave up on a broken call and is calling again: start over.
             state == CallState.RECONNECTING && from == prefs.peerName -> {
                 endCall(null, notifyPeer = false)
@@ -379,11 +382,35 @@ object CallManager {
         if (from.isNotBlank()) prefs.peerName = from
     }
 
-    /** Answer right away (auto-answer setting, or both tablets called each other at once). */
+    /** Answer right away: both tablets called each other at the same moment. */
     private fun accept(c: Conn, from: String, sid: String) {
         takeIncoming(c, from, sid)
         main.post { onWakeUp?.invoke() }
         startAnswered(c)
+    }
+
+    /**
+     * Auto-answer setting: ring the bell once so the room hears that a call is coming in, then
+     * answer by itself. The camera, microphone and call audio only start once the bell has
+     * finished: switching to call audio mid-bell cut the bell short, and an open microphone would
+     * send the bell to the other tablet.
+     */
+    private fun autoAnswer(c: Conn, from: String, sid: String) {
+        takeIncoming(c, from, sid)
+        val id = callId
+        Log.i(TAG, "incoming call from ${prefs.peerName}, auto-answering after the bell")
+        setState(CallState.AUTO_ANSWERING)
+        c.send(msg("ringing"))
+        main.post { onWakeUp?.invoke() }
+        val answerNow = Runnable {
+            exec.execute {
+                val cc = conn
+                if (callId == id && state == CallState.AUTO_ANSWERING && cc != null) startAnswered(cc, chime = false)
+            }
+        }
+        playBell(onDone = answerNow)
+        // In case the player never reports that it finished.
+        timers.schedule(answerNow, BELL_FALLBACK_MS, TimeUnit.MILLISECONDS)
     }
 
     /** Ring here and wait for someone to press Answer or Decline. */
@@ -413,11 +440,11 @@ object CallManager {
         timers.schedule({ exec.execute { ringTick(id) } }, RING_REPEAT_MS, TimeUnit.MILLISECONDS)
     }
 
-    private fun startAnswered(c: Conn) {
+    private fun startAnswered(c: Conn, chime: Boolean = true) {
         val id = callId
         setState(CallState.CONNECTING)
         c.send(msg("ok").put("name", prefs.myName))
-        chime()
+        if (chime) chime()
         if (!startMedia()) return
         armTimeout(id, CONNECT_TIMEOUT_MS)
     }
@@ -578,7 +605,11 @@ object CallManager {
         }
     }
 
-    private fun playBell() {
+    /** Players that are still playing; kept here so they aren't garbage-collected mid-sound. */
+    private val bellPlayers = java.util.Collections.synchronizedSet(HashSet<MediaPlayer>())
+
+    /** Plays the ding-dong; [onDone] runs when it has finished (or failed to play). */
+    private fun playBell(onDone: Runnable? = null) {
         try {
             val afd = ctx.resources.openRawResourceFd(R.raw.bell)
             val mp = MediaPlayer()
@@ -592,11 +623,19 @@ object CallManager {
             afd.close()
             val v = prefs.bellVolume.coerceIn(0, 100) / 100f
             mp.setVolume(v, v)
-            mp.setOnCompletionListener { it.release() }
+            val finished = { p: MediaPlayer ->
+                bellPlayers.remove(p)
+                p.release()
+                onDone?.run()
+            }
+            mp.setOnCompletionListener { finished(it) }
+            mp.setOnErrorListener { p, _, _ -> finished(p); true }
             mp.prepare()
+            bellPlayers.add(mp)
             mp.start()
         } catch (e: Exception) {
             Log.w(TAG, "bell sound failed", e)
+            onDone?.run()
         }
     }
 

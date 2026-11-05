@@ -11,7 +11,8 @@ over your home Wi-Fi.
   and microphone stay off until someone there presses **Answer** (then a short chime plays
   so the room knows the camera is on). Unanswered calls stop after 45 s and show
   "Missed call from …". Either side can press **End call**.
-- Optionally, a tablet can **answer automatically** (off by default, see settings).
+- Optionally, a tablet can **answer automatically** (off by default, see settings): it rings
+  the bell once, then the call starts by itself.
 - **Bell** rings a ding-dong on the other tablet and shows "🔔 Bell from …" without turning on
   any camera, so the other room can call back when it suits them.
 - If the Wi-Fi hiccups during a call it shows **Reconnecting…** and recovers by itself

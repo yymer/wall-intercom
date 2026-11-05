@@ -191,17 +191,20 @@ class MainActivity : Activity(), CallManager.Listener {
     override fun onCallState(state: CallState, peer: String, info: String?) {
         val inCall = state != CallState.IDLE
         val ringingHere = state == CallState.INCOMING
+        val autoAnswering = state == CallState.AUTO_ANSWERING
         // No video views while it's only ringing: nothing is being captured or shown yet.
-        val videoVis = if (inCall && !ringingHere) View.VISIBLE else View.GONE
+        val videoVis = if (inCall && !ringingHere && !autoAnswering) View.VISIBLE else View.GONE
         remoteView.visibility = videoVis
         localView.visibility = videoVis
         callPanel.visibility = if (inCall) View.VISIBLE else View.GONE
+        // While the bell plays before an auto-answered call: just "Incoming call", no buttons.
+        endBtn.visibility = if (autoAnswering) View.GONE else View.VISIBLE
         answerBtn.visibility = if (ringingHere) View.VISIBLE else View.GONE
         endBtn.setText(if (ringingHere) R.string.decline else R.string.end_call)
         callStatus.text = when (state) {
             CallState.DIALING -> getString(R.string.state_calling, peer)
             CallState.RINGING -> getString(R.string.state_ringing, peer)
-            CallState.INCOMING -> getString(R.string.state_incoming)
+            CallState.INCOMING, CallState.AUTO_ANSWERING -> getString(R.string.state_incoming)
             CallState.CONNECTING -> getString(R.string.state_connecting, peer)
             CallState.IN_CALL -> peer
             CallState.RECONNECTING -> getString(R.string.state_reconnecting)
