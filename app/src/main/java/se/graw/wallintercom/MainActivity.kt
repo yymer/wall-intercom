@@ -537,7 +537,7 @@ class MainActivity : Activity(), CallManager.Listener {
         front = incoming
     }
 
-    /** Decodes an image downsampled to roughly screen size, rotated according to EXIF. */
+    /** Decodes an image downsampled to roughly screen size, turned the right way up according to EXIF. */
     private fun decode(uri: Uri, targetLongSide: Int): Bitmap? {
         try {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -548,21 +548,19 @@ class MainActivity : Activity(), CallManager.Listener {
             val opts = BitmapFactory.Options().apply { inSampleSize = sample }
             val bmp = contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
                 ?: return null
-            val orientation = try {
-                contentResolver.openInputStream(uri)?.use {
-                    ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-                } ?: ExifInterface.ORIENTATION_NORMAL
+            val exif = try {
+                contentResolver.openInputStream(uri)?.use { ExifInterface(it) }
             } catch (_: Exception) {
-                ExifInterface.ORIENTATION_NORMAL
+                null
             }
-            val degrees = when (orientation) {
-                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-                else -> 0f
+            val degrees = exif?.rotationDegrees ?: 0
+            val flipped = exif?.isFlipped ?: false
+            if (degrees == 0 && !flipped) return bmp
+            val matrix = Matrix().apply {
+                if (flipped) postScale(-1f, 1f)
+                postRotate(degrees.toFloat())
             }
-            if (degrees == 0f) return bmp
-            val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, Matrix().apply { postRotate(degrees) }, true)
+            val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
             if (rotated !== bmp) bmp.recycle()
             return rotated
         } catch (e: Throwable) { // includes OutOfMemoryError on huge images
