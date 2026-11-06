@@ -95,6 +95,11 @@
     <string name="auto_answer">Answer calls automatically</string>
     <string name="h_paired_devices">Paired devices</string>
     <string name="devices_none">No paired devices yet. Other devices on the Wi-Fi show up here when Wall Intercom is running on them.</string>
+    <string name="allow_pairing">Allow pairing requests</string>
+    <string name="allow_pairing_hint">When off, requests from other devices are ignored without anything showing here</string>
+    <string name="hide_unpaired">Hide unpaired devices</string>
+    <string name="hide_unpaired_hint">On the main screen. They\'re still listed here.</string>
+    <string name="devices_none_hidden">No paired devices yet. Pair devices in the settings.</string>
     <string name="devices_searching">Looking for other devices on the Wi-Fi…\nWall Intercom has to be running on them.</string>
     <string name="device_new">new</string>
     <string name="remove">Remove</string>

@@ -117,6 +117,8 @@ class SettingsActivity : Activity() {
         section(R.string.h_paired_devices) {
             devicesCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             col.addView(devicesCol)
+            switchRow(R.string.allow_pairing, R.string.allow_pairing_hint, prefs.allowPairing) { prefs.allowPairing = it }
+            switchRow(R.string.hide_unpaired, R.string.hide_unpaired_hint, prefs.hideUnpaired) { prefs.hideUnpaired = it }
         }
         section(R.string.h_screen) {
             intRow(R.string.idle_brightness, null, prefs.idleBrightness, 0..100) { prefs.idleBrightness = it }

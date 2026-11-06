@@ -94,6 +94,11 @@
     <string name="auto_answer">Svara automatiskt på samtal</string>
     <string name="h_paired_devices">Ihopparade enheter</string>
     <string name="devices_none">Inga ihopparade enheter än. Andra enheter på wifi-nätet visas här när Wall Intercom är igång på dem.</string>
+    <string name="allow_pairing">Tillåt förfrågningar om ihopparning</string>
+    <string name="allow_pairing_hint">När det är av ignoreras förfrågningar från andra enheter utan att något visas här</string>
+    <string name="hide_unpaired">Dölj enheter som inte är ihopparade</string>
+    <string name="hide_unpaired_hint">På huvudskärmen. De visas fortfarande här.</string>
+    <string name="devices_none_hidden">Inga ihopparade enheter än. Para ihop enheter i inställningarna.</string>
     <string name="devices_searching">Letar efter andra enheter på wifi-nätet…\nWall Intercom måste vara igång på dem.</string>
     <string name="device_new">ny</string>
     <string name="remove">Ta bort</string>

@@ -34,6 +34,11 @@ class Prefs(ctx: Context) {
     /** The paired tablets as JSON; use [Peers]. */
     var peersJson: String? get() = p.getString("peers", null); set(v) = put("peers", v)
 
+    /** Off: pairing requests from other tablets are dropped, with nothing shown or sent back. */
+    var allowPairing: Boolean get() = bool("allowPairing", true); set(v) = put("allowPairing", v)
+    /** Leaves tablets that aren't paired off the main screen. They're still in the settings. */
+    var hideUnpaired: Boolean get() = bool("hideUnpaired", false); set(v) = put("hideUnpaired", v)
+
     /** The slideshow shows either an album (gallery folder) or a folder picked with "Other folder…". */
     var albumId: String? get() = p.getString("albumId", null); set(v) = put("albumId", v)
     var albumName: String? get() = p.getString("albumName", null); set(v) = put("albumName", v)

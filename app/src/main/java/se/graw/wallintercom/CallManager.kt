@@ -586,6 +586,7 @@ object CallManager {
 
     /** First step of pairing: nothing shows here until the other tablet has revealed its key. */
     private fun onPairRequest(c: Conn, m: JSONObject) {
+        if (!prefs.allowPairing) return c.close()
         val id = m.optString("id")
         val name = m.optString("name").take(60).ifBlank { c.remoteAddress?.hostAddress ?: "?" }
         val commit = m.optString("commit")
@@ -599,6 +600,7 @@ object CallManager {
 
     /** The other tablet's key: both tablets can now work out the code. */
     private fun onPairReveal(c: Conn, m: JSONObject) {
+        if (!prefs.allowPairing) return c.close()
         val start = c.pairStart ?: return c.close()
         c.pairStart = null
         val pub = m.optString("pub")

@@ -131,6 +131,8 @@ device by IP address are under *Advanced settings*.
 | Night mode | off (22:00–07:00, 2% when on) | 0% turns the backlight off; a touch, call or bell wakes it |
 | Start automatically | off | Starts the app when the tablet is turned on. On Android 10, showing the screen at boot also needs *Allow waking up over other apps*; without it only the call listener starts |
 | Answer calls automatically | off | When on, incoming calls connect without anyone pressing Answer |
+| Allow pairing requests | on | When off, requests are dropped: nothing shows here, and the other tablet just can't reach this one. Pairings already made keep working |
+| Hide unpaired devices | off | Keeps them off the main screen. They're still in the settings, for pairing from there |
 | Call volume | 80% | |
 | Bell volume | 80% | Plays on Android's *alarm* volume channel |
 | Hang up automatically after | 15 min | 0 = never |

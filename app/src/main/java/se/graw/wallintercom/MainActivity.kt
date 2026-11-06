@@ -279,11 +279,17 @@ class MainActivity : Activity(), CallManager.Listener {
         devicesList.removeAllViews()
         bellButtons.clear()
         onlineDevices.clear()
-        val devices = CallManager.devices()
+        val devices = CallManager.devices().filter { it.paired || !prefs.hideUnpaired }
         if (devices.isEmpty()) {
             devicesList.addView(TextView(this).apply {
                 // Paired devices exist but none is on right now, or nothing paired/found yet.
-                setText(if (Peers.all().isNotEmpty()) R.string.devices_all_offline else R.string.devices_searching)
+                setText(
+                    when {
+                        Peers.all().isNotEmpty() -> R.string.devices_all_offline
+                        prefs.hideUnpaired -> R.string.devices_none_hidden
+                        else -> R.string.devices_searching
+                    }
+                )
                 gravity = Gravity.CENTER
                 textSize = 20f
                 setTextColor(Color.WHITE)
