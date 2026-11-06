@@ -217,8 +217,13 @@ adb shell dpm set-device-owner se.graw.wallintercom/.AdminReceiver
 The app then pins itself on screen and, on Android 6 and newer, disables the lock screen.
 *Open Android settings* under *Advanced settings* temporarily unpins it.
 
-**Try the app without this step first:** undoing device owner, and then uninstalling the app,
-requires a factory reset.
+To undo it, press *Stop being device owner* under *Advanced settings*. You can then leave and
+uninstall the app as usual. While the app is device owner, this button is the only way out short
+of a factory reset: Android refuses `adb uninstall`. Anyone who can open the settings can press it
+too, so this stops casual use rather than someone determined.
+
+**Install the build you want to keep first:** Android only installs updates signed with the same
+key, and you can't uninstall the app while it's device owner.
 
 ## Troubleshooting
 
