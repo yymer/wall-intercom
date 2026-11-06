@@ -59,7 +59,7 @@ object PairingDialogs {
                 waiting.dismissSafely()
                 val n = name ?: label
                 val text = when (why) {
-                    Link.PairFailure.UNREACHABLE -> act.getString(R.string.err_unreachable, n)
+                    Link.PairFailure.UNREACHABLE -> act.getString(R.string.pair_unreachable)
                     Link.PairFailure.DECLINED -> act.getString(R.string.pair_declined, n)
                     Link.PairFailure.BUSY -> act.getString(R.string.pair_busy, n)
                     Link.PairFailure.ALREADY_PAIRING -> act.getString(R.string.pair_already, n)

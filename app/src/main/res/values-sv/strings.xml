@@ -117,6 +117,7 @@
     <string name="pair_contacting">Kontaktar %1$s…</string>
     <string name="pair_waiting">Kod: %1$s\n\nVäntar på att någon vid %2$s trycker på Godkänn. Kontrollera att den visar samma kod.</string>
     <string name="pair_ok">Ihopparad med %1$s</string>
+    <string name="pair_unreachable">Det gick inte att para ihop med enheten. Kontrollera att enheten är online och tar emot förfrågningar om ihopparning.</string>
     <string name="pair_declined">%1$s tackade nej.</string>
     <string name="pair_busy">%1$s är upptagen just nu. Försök igen om en stund.</string>
     <string name="pair_already">%1$s håller redan på att paras ihop med en annan surfplatta. Försök igen om en stund.</string>
