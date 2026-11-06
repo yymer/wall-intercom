@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="settings_background">#F1F3F2</color>
+
     <!-- The settings screens: light, with the same green as the app icon and Call button. -->
     <style name="Theme.WallIntercom.Settings" parent="@android:style/Theme.Material.Light.DarkActionBar">
         <item name="android:colorPrimary">#25803F</item>
         <item name="android:colorPrimaryDark">#1C6330</item>
         <item name="android:colorAccent">#25803F</item>
-        <item name="android:windowBackground">#F1F3F2</item>
+        <item name="android:homeAsUpIndicator">@drawable/ic_back</item>
+        <!-- Must be a resource: Android 5 ignores a plain color here, and leaves the window unpainted. -->
+        <item name="android:windowBackground">@color/settings_background</item>
     </style>
 </resources>
