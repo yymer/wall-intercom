@@ -5,19 +5,25 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Slideshow: two image views cross-fading -->
-    <ImageView
-        android:id="@+id/imgA"
+    <!-- Slideshow: two image views cross-fading. In their own layout so that the incoming one can
+         be brought to the front of the other without covering the rest of the screen. -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:importantForAccessibility="no" />
+        android:layout_height="match_parent">
 
-    <ImageView
-        android:id="@+id/imgB"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:alpha="0"
-        android:importantForAccessibility="no" />
+        <ImageView
+            android:id="@+id/imgA"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no" />
+
+        <ImageView
+            android:id="@+id/imgB"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="0"
+            android:importantForAccessibility="no" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/hint"

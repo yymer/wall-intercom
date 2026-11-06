@@ -532,8 +532,14 @@ class MainActivity : Activity(), CallManager.Listener {
         outgoing.animate().cancel()
         incoming.setImageBitmap(bmp)
         incoming.alpha = 0f
-        incoming.animate().alpha(1f).setDuration(1500).start()
-        outgoing.animate().alpha(0f).setDuration(1500).withEndAction { outgoing.setImageDrawable(null) }.start()
+        incoming.bringToFront()
+        // The old picture stays solid underneath: fading both at once lets the black background
+        // through, and the screen visibly dims halfway. Once covered, only what shows beside a new
+        // picture that doesn't fill the screen is left to fade.
+        outgoing.alpha = 1f
+        incoming.animate().alpha(1f).setDuration(1500).withEndAction {
+            outgoing.animate().alpha(0f).setDuration(500).withEndAction { outgoing.setImageDrawable(null) }.start()
+        }.start()
         front = incoming
     }
 
