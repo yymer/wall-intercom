@@ -61,10 +61,17 @@
 
         <activity
             android:name=".SettingsActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:exported="false"
             android:label="@string/settings_title"
-            android:theme="@android:style/Theme.Material.Light"
+            android:theme="@style/Theme.WallIntercom.Settings"
             android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".PicturesActivity"
+            android:exported="false"
+            android:label="@string/see_pictures"
+            android:theme="@style/Theme.WallIntercom.Settings" />
 
         <!-- "Share → Wall Intercom" from other apps adds pictures to the slideshow album -->
         <activity

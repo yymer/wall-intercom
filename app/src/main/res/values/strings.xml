@@ -6,7 +6,7 @@
     <string name="state_calling">Calling %1$s…</string>
     <string name="state_connecting">Connecting to %1$s…</string>
     <string name="hold_for_settings">Press and hold ⚙ to open settings</string>
-    <string name="no_folder">No photo album chosen yet.\n\nTap the screen, then press and hold ⚙ to open settings.</string>
+    <string name="no_folder">No photos yet.\n\nTo add photos to the slideshow, open a photo and press Share, then select \"Wall Intercom\".</string>
     <string name="no_pictures">No pictures found in the chosen album.</string>
     <string name="default_my_name">Tablet</string>
     <string name="err_unreachable">Couldn\'t reach %1$s</string>
@@ -23,12 +23,11 @@
     <string name="my_ip">IP address: %1$s</string>
     <string name="ip_not_connected">(not connected)</string>
     <string name="ip_unknown">(unknown)</string>
-    <string name="my_name">Name of this room (e.g. Kitchen)</string>
-    <string name="port">Port (must be the same on all tablets)</string>
+    <string name="my_name">Name</string>
+    <string name="port">Port</string>
     <string name="h_slideshow">Slideshow</string>
-    <string name="folder_none">Pictures: (none chosen)</string>
-    <string name="folder">Pictures: folder %1$s</string>
-    <string name="album">Pictures: album \"%1$s\"</string>
+    <string name="folder">Folder %1$s</string>
+    <string name="album">Album \"%1$s\"</string>
     <string name="choose_album">Choose album…</string>
     <string name="no_albums">No albums with pictures found on this tablet</string>
     <string name="need_photo_permission">The app needs access to photos to show albums</string>
@@ -37,7 +36,7 @@
         <item quantity="other">%d pictures</item>
     </plurals>
     <string name="choose_folder">Other folder…</string>
-    <string name="share_tip">Tip: to add photos, select them in Photos (or any app), press Share and choose Wall Intercom. They go into the album \"Wall Intercom\".</string>
+    <string name="share_tip">To add photos to the slideshow, open a photo and press Share, then select \"Wall Intercom\".</string>
     <string name="ok">OK</string>
     <string name="share_nothing">Nothing to add: no pictures were shared.</string>
     <string name="share_need_permission">Wall Intercom needs access to storage to save the pictures.</string>
@@ -61,17 +60,17 @@
         <item quantity="other">%d couldn\'t be added.</item>
     </plurals>
     <string name="slide_seconds">Seconds per picture</string>
-    <string name="fill_screen">Fill the whole screen (crops pictures slightly)</string>
+    <string name="fill_screen">Fill the whole screen</string>
     <string name="h_screen">Screen</string>
     <string name="idle_brightness">Brightness while showing pictures (%)</string>
     <string name="night_start">Night starts at hour (0–23)</string>
     <string name="night_end">Night ends at hour (0–23)</string>
-    <string name="night_brightness">Brightness at night (%) – 0 turns the backlight off, touch to wake</string>
+    <string name="night_brightness">Brightness at night (%)</string>
     <string name="h_calls">Calls</string>
     <string name="call_volume">Call volume (%)</string>
-    <string name="max_minutes">Hang up automatically after N minutes (0 = never)</string>
-    <string name="hd_video">HD video (1280×720) – try it if the tablets are fast enough</string>
-    <string name="hw_echo">Use the tablet\'s built-in echo cancellation instead of WebRTC\'s</string>
+    <string name="max_minutes">Hang up automatically after (minutes)</string>
+    <string name="hd_video">HD video (1280×720)</string>
+    <string name="hw_echo">Built-in echo cancellation</string>
     <string name="h_permissions">Permissions</string>
     <string name="allow_overlay">Allow waking up over other apps</string>
     <string name="allow_battery">Don\'t let Android put this app to sleep</string>
@@ -91,16 +90,16 @@
     <string name="missed_call">Missed call from %1$s</string>
     <string name="err_declined">%1$s can\'t answer right now</string>
     <string name="err_no_answer">%1$s didn\'t answer</string>
-    <string name="auto_answer">Answer calls automatically (the camera turns on without anyone pressing Answer)</string>
-    <string name="h_rooms">Rooms</string>
-    <string name="rooms_none">No rooms paired yet. Touch the photo on this tablet: the other tablets on the Wi-Fi show up there, and pressing Call or Bell pairs with them.</string>
-    <string name="rooms_searching">Looking for other tablets on the Wi-Fi…\nWall Intercom has to be running on them.</string>
-    <string name="room_new">new</string>
+    <string name="auto_answer">Answer calls automatically</string>
+    <string name="h_paired_devices">Paired devices</string>
+    <string name="devices_none">No paired devices yet. Other tablets on the Wi-Fi show up here when Wall Intercom is running on them.</string>
+    <string name="devices_searching">Looking for other tablets on the Wi-Fi…\nWall Intercom has to be running on them.</string>
+    <string name="device_new">new</string>
     <string name="remove">Remove</string>
     <string name="remove_confirm">Remove %1$s? The two tablets can\'t call or ring each other until they\'re paired again.</string>
-    <string name="add_by_ip">Add room by IP address…</string>
+    <string name="add_by_ip">Add device by IP address…</string>
     <string name="add_by_ip_hint">Only needed if a tablet doesn\'t show up by itself (some routers block that).</string>
-    <string name="ip_prompt">IP address of the other tablet (shown at the top of its settings)</string>
+    <string name="ip_prompt">IP address of the other tablet (shown under Advanced settings on that tablet)</string>
     <string name="tablet_at">the tablet at %1$s</string>
     <string name="pair">Pair</string>
     <string name="accept">Accept</string>
@@ -117,7 +116,28 @@
     <string name="pair_request_title">%1$s wants to pair with this tablet</string>
     <string name="pair_request_msg">Code: %1$s\n\nOnly accept if %2$s shows the same code. Then %2$s can call and ring this tablet.</string>
     <string name="err_forgotten">%1$s doesn\'t know this tablet anymore. Touch the photo to pair again.</string>
-    <string name="rooms_all_offline">None of the other rooms is reachable right now.</string>
-    <string name="auto_start">Start automatically when the tablet is turned on (so it can take calls after a restart)</string>
-    <string name="use_as_home">Use as the tablet\'s home screen (the Home button and restarts always come back here; for tablets that only run Wall Intercom)</string>
+    <string name="devices_all_offline">None of the other devices is reachable right now.</string>
+    <string name="auto_start">Start when the tablet is turned on</string>
+    <string name="use_as_home">Use as the tablet\'s home screen</string>
+    <string name="fill_screen_hint">Crops pictures slightly instead of showing black bars</string>
+    <string name="night_brightness_hint">0 turns the backlight off; touch to wake</string>
+    <string name="max_minutes_hint">0 = never</string>
+    <string name="hd_video_hint">Try it if the tablets are fast enough</string>
+    <string name="hw_echo_hint">Use the tablet\'s own instead of WebRTC\'s. Try it if you get echo.</string>
+    <string name="auto_answer_hint">The camera turns on without anyone pressing Answer</string>
+    <string name="auto_start_hint">So it can take calls after a restart</string>
+    <string name="use_as_home_hint">The Home button and restarts always come back here. For tablets that only run Wall Intercom.</string>
+    <string name="port_hint">Must be the same on all tablets</string>
+    <string name="h_advanced">Advanced settings</string>
+    <string name="advanced_hint">Home screen, video and sound options, network</string>
+    <string name="h_network">Network</string>
+    <string name="see_pictures">See the pictures in the slideshow</string>
+    <string name="change_album">Use a different album</string>
+    <string name="change_album_hint">Show another album or folder instead of the Wall Intercom album</string>
+    <string name="use_default_album">Use the Wall Intercom album</string>
+    <string name="use_default_album_hint">The default: where photos you share to Wall Intercom end up</string>
+    <string name="no_pictures_yet">No pictures here yet.</string>
+    <string name="device_online">Online</string>
+    <string name="device_offline">Offline</string>
+    <string name="device_not_paired">Found on the Wi-Fi, not paired</string>
 </resources>

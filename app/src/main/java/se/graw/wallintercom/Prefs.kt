@@ -19,7 +19,7 @@ class Prefs(ctx: Context) {
         }
     }.apply()
 
-    /** Name of this room, shown on the other tablets. */
+    /** Name of this tablet, shown on the other tablets. */
     var myName: String get() = str("myName", Build.MODEL); set(v) = put("myName", v)
     /** Same TCP (calls) and UDP (discovery) port on all tablets. */
     var port: Int get() = int("port", 47555); set(v) = put("port", v)

@@ -6,10 +6,10 @@ and talk directly to each other.
 
 - Full-screen, cross-fading **slideshow** from a photo album on the tablet. To add photos,
   select them in Photos (or any app) → **Share → Wall Intercom**.
-- Touch the screen and each room appears with an online dot and two buttons, **Call** and
+- Touch the screen and each tablet appears with an online dot and two buttons, **Call** and
   **Bell**. They stay for 25 s.
 - **Pairing is one tap**: other tablets on the Wi-Fi show up by themselves, marked *new*.
-  Pressing Call or Bell on a new room asks to pair; the other tablet shows the same 4-digit code
+  Pressing Call or Bell on a new tablet asks to pair; the other tablet shows the same 4-digit code
   and someone there presses **Accept**. Pairings survive IP and network changes.
 - **Call** rings the other tablet: it wakes up and shows **Answer** / **Decline**. The camera
   and microphone stay off until someone there presses **Answer** (then a short chime plays
@@ -58,27 +58,28 @@ open an issue with how it goes on yours.
    ```
 2. Add photos: select them in Google Photos, Files or any other app → **Share** →
    **Wall Intercom**. They're copied into the album *Wall Intercom* (`Pictures/Wall Intercom`),
-   which the slideshow then shows. Sharing the same photo twice doesn't copy it again.
+   which the slideshow shows by default. Sharing the same photo twice doesn't copy it again.
 3. Open **Wall Intercom**. Tap the screen, then **press and hold ⚙** (top right) for settings:
-   - *Name of this room*, e.g. `Kitchen`.
-   - Tick *Start automatically when the tablet is turned on*, so it can take calls again after
-     a restart or power cut (off by default).
-   - Optional: *Choose album…* to show a different album on the tablet instead (e.g. Camera),
-     or *Other folder…* for any folder, e.g. on an SD card.
+   - *Name*: what the other tablets call this one, e.g. `Kitchen`.
+   - Turn on *Start when the tablet is turned on*, so it can take calls again after a restart
+     or power cut (off by default).
+   - *See the pictures in the slideshow* shows what's in it. Optional: *Use a different album*
+     shows another album on the tablet instead (e.g. Camera), or any folder, e.g. on an SD card.
    - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*
      (Android 6 and newer; Android 5 doesn't have these).
    - **Save**.
-4. Optional, for a tablet that only runs Wall Intercom: tick *Use as the tablet's home screen*
-   in settings, then press the Home button and choose **Wall Intercom → Always**. The Home
+4. Optional, for a tablet that only runs Wall Intercom: turn on *Use as the tablet's home screen*
+   in *Advanced settings*, then press the Home button and choose **Wall Intercom → Always**. The Home
    button and restarts then always come back to it. (Off by default, so it doesn't compete with
    the tablet's normal launcher.)
 5. Android settings → *Security → Screen lock* → **None** (or *Swipe*), so calls aren't stuck
    behind the lock screen. With a PIN, pattern or password, Android keeps apps' data locked
    after a restart until someone unlocks the tablet, so Wall Intercom can't start by itself.
-6. Pair the tablets: touch the photo, and press **Call** or **Bell** next to a room marked
-   *new*. Check that both tablets show the same code and press **Accept** on the other one.
-   With more than two tablets, pair each two that should be able to call each other.
-   (If a tablet never shows up, use *Settings → Add room by IP address…*.)
+6. Pair the tablets: touch the photo, and press **Call** or **Bell** next to a tablet marked
+   *new* (or press **Pair** under *Paired devices* in settings). Check that both tablets show the
+   same code and press **Accept** on the other one. With more than two tablets, pair each two
+   that should be able to call each other. (If a tablet never shows up, use *Advanced settings →
+   Add device by IP address…*.)
 7. If the tablet has **Dolby Atmos** or similar sound "enhancement", turn it off
    (Settings → Sound). It confuses echo cancellation and causes echo/noise during calls.
 
@@ -118,6 +119,9 @@ which tells the room the camera just turned on.
 
 ## Settings
 
+The home screen option, automatic hang-up, HD video, echo cancellation, the port and adding a
+device by IP address are under *Advanced settings*.
+
 | Setting | Default | Notes |
 |---|---|---|
 | Seconds per picture | 20 | Photos are shuffled; the album is re-scanned every round |
@@ -148,7 +152,7 @@ which tells the room the camera just turned on.
 - Anyone on the same network can *ask* to pair, which shows a request on the tablet and wakes
   its screen. Requests are limited to one per 15 s, and only ring the bell once per 5 minutes.
   Never accept one you didn't start: the name it shows is chosen by whoever sent it. Remove a
-  room in *Settings → Rooms*; the other tablet forgets this one too.
+  device under *Paired devices* in settings; the other tablet forgets this one too.
 - Devices that aren't paired can't do much else: connections have size and time limits. Someone
   on your network can still disturb it (a flood of traffic can block calls, as with any device
   on the network), so this is meant for a network you trust, not a public or guest Wi-Fi.
@@ -183,9 +187,9 @@ adb logcat -d | grep CallManager
 
 - **A tablet doesn't show up, or shows a grey dot**: check that the app runs on it, that both
   are on the same network and use the same port. Some routers block the discovery broadcasts:
-  pair with *Add room by IP address…* instead. Some routers have "client/AP isolation" turned on for Wi-Fi, which
+  pair with *Advanced settings → Add device by IP address…* instead. Some routers have "client/AP isolation" turned on for Wi-Fi, which
   blocks devices from talking to each other.
-- **A paired room shows up as *new* again**: that tablet says it no longer knows this one (it
+- **A paired tablet shows up as *new* again**: that tablet says it no longer knows this one (it
   was reset, or removed this one while it couldn't tell). Press Call or Bell to pair again.
 - **"Already pairing" right after a declined or cancelled request**: wait 15 s and try again.
 - **Echo or noise**: turn off Dolby/sound enhancements, lower *Call volume*, or try the
@@ -210,12 +214,12 @@ adb logcat -d | grep CallManager
   Audio/video is WebRTC, peer-to-peer on the LAN (no STUN/TURN). On a network hiccup the
   caller re-opens the socket (`resume`) and does an ICE restart; the call only ends if it
   can't recover within 30 s.
-- `MainActivity`: slideshow, room rows, call screen, brightness. `PairingDialogs`: the
+- `MainActivity`: slideshow, device rows, call screen, brightness. `PairingDialogs`: the
   pairing dialogs on both tablets.
 - `Albums`: lists the tablet's photo albums from Android's media library, and copies shared
   photos into the app's own album.
 - `ShareActivity`: the *Share → Wall Intercom* target.
-- `SettingsActivity`: the settings form.
+- `SettingsActivity`: the settings form and its pages. `PicturesActivity`: the pictures in the slideshow.
 - Translations are in `app/src/main/res/values*/strings.xml`. To add a language, copy
   `values/strings.xml` to `values-xx/` and translate it.
 

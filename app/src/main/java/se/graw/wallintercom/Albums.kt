@@ -6,10 +6,12 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Point
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
@@ -90,6 +92,70 @@ object Albums {
             Log.w(TAG, "can't list album $albumId", e)
         }
         return out
+    }
+
+    /** The app's own album, once something has been shared to it. Call off the main thread. */
+    fun ownAlbum(cr: ContentResolver): Album? = list(cr).firstOrNull { it.name == OWN_ALBUM }
+
+    /**
+     * The pictures the slideshow shows: the chosen album or folder, or by default the app's own
+     * album. Call off the main thread.
+     */
+    fun slideshowImages(cr: ContentResolver, prefs: Prefs): List<Uri> {
+        val albumId = prefs.albumId
+        val folder = prefs.folderUri
+        return when {
+            albumId != null -> images(cr, albumId)
+            folder != null -> folderImages(cr, Uri.parse(folder))
+            else -> ownAlbum(cr)?.let { images(cr, it.id) } ?: emptyList()
+        }
+    }
+
+    private fun folderImages(cr: ContentResolver, tree: Uri): List<Uri> {
+        val out = ArrayList<Uri>()
+        try {
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(
+                tree, DocumentsContract.getTreeDocumentId(tree)
+            )
+            cr.query(
+                children,
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE),
+                null, null, null
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    val mime = c.getString(1) ?: ""
+                    if (mime.startsWith("image/")) {
+                        out += DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "can't list folder", e)
+        }
+        return out
+    }
+
+    /** A small preview of a picture from [slideshowImages]. Call off the main thread. */
+    fun thumbnail(cr: ContentResolver, image: Uri): Bitmap? {
+        if (image.authority == MediaStore.AUTHORITY) return thumbnail(cr, ContentUris.parseId(image))
+        return try {
+            DocumentsContract.getDocumentThumbnail(cr, image, Point(256, 256), null)
+        } catch (_: Exception) {
+            null
+        } ?: decodeSmall(cr, image)
+    }
+
+    /** For a folder whose storage provider doesn't make thumbnails. */
+    private fun decodeSmall(cr: ContentResolver, image: Uri): Bitmap? = try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        cr.openInputStream(image)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 256) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        cr.openInputStream(image)?.use { BitmapFactory.decodeStream(it, null, options) }
+    } catch (e: Exception) {
+        Log.w(TAG, "can't decode $image", e)
+        null
     }
 
     /** A small preview of one picture, for the album list. Call off the main thread. */

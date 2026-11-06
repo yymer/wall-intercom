@@ -115,8 +115,8 @@ object CallManager {
 
     interface Listener {
         fun onCallState(state: CallState, peer: String, info: String?)
-        /** Paired/found tablets or their online status changed: see [rooms]. */
-        fun onRoomsChanged()
+        /** Paired/found tablets or their online status changed: see [devices]. */
+        fun onDevicesChanged()
         fun onBell(from: String)
         /** Our outgoing call was declined or not answered; shown next to the Call button. */
         fun onCallNotAnswered(info: String)
@@ -127,7 +127,7 @@ object CallManager {
     }
 
     /** One row on the main screen: a paired tablet, or a new one found on the network. */
-    data class Room(val id: String, val name: String, val paired: Boolean, val online: Boolean, val ip: String, val port: Int)
+    data class Device(val id: String, val name: String, val paired: Boolean, val online: Boolean, val ip: String, val port: Int)
 
     private class PendingPair(val c: Conn, val id: String, val name: String, val port: Int, val key: ByteArray, val code: String)
 
@@ -219,7 +219,7 @@ object CallManager {
             PeerConnectionFactory.InitializationOptions.builder(ctx).createInitializationOptions()
         )
         thread(name = "intercom-listener", isDaemon = true) { listenLoop() }
-        Discovery.onChange = { roomsChanged() }
+        Discovery.onChange = { devicesChanged() }
         Discovery.start(prefs)
         timers.scheduleWithFixedDelay({ pingAll() }, 3, 20, TimeUnit.SECONDS)
     }
@@ -230,7 +230,7 @@ object CallManager {
      * Paired tablets first (in pairing order), then new ones found on the network. Paired tablets
      * that have been unreachable for a while are left out until they're back.
      */
-    fun rooms(): List<Room> {
+    fun devices(): List<Device> {
         val peers = Peers.all()
         val found = Discovery.found()
         val now = System.currentTimeMillis()
@@ -238,11 +238,20 @@ object CallManager {
             val seen = maxOf(lastSeen[p.id] ?: 0L, found.firstOrNull { it.id == p.id }?.seen ?: 0L)
             p.id !in forgottenBy && (online[p.id] == true || now - seen < HIDE_OFFLINE_AFTER_MS)
         }.map { p ->
-            Room(p.id, p.name, true, online[p.id] == true, p.ip ?: "", p.port)
+            Device(p.id, p.name, true, online[p.id] == true, p.ip ?: "", p.port)
         }
         val new = found.filter { f -> f.id in forgottenBy || peers.none { it.id == f.id } }
             .sortedBy { it.name }
-            .map { Room(it.id, it.name.ifBlank { it.ip }, false, true, it.ip, it.port) }
+            .map { Device(it.id, it.name.ifBlank { it.ip }, false, true, it.ip, it.port) }
+        return paired + new
+    }
+
+    /** For the settings: every paired tablet, even offline ones, then new ones on the network. */
+    fun allDevices(): List<Device> {
+        val new = devices().filter { !it.paired }
+        val paired = Peers.all().filter { p -> new.none { it.id == p.id } }.map { p ->
+            Device(p.id, p.name, true, online[p.id] == true, p.ip ?: "", p.port)
+        }
         return paired + new
     }
 
@@ -303,7 +312,7 @@ object CallManager {
         startAnswered(c)
     }
 
-    /** Check now which rooms are online, and look for new tablets. */
+    /** Check now which devices are online, and look for new tablets. */
     fun pingNow() {
         Discovery.search()
         timers.execute { pingAll() }
@@ -339,7 +348,7 @@ object CallManager {
         Peers.remove(peerId)
         forgottenBy.remove(peerId)
         online.remove(peerId)
-        roomsChanged()
+        devicesChanged()
         // Uses the copy: it still has the key needed to prove it's us.
         timers.execute { Link.request(prefs, peer, msg("unpair"), 2000) }
     }
@@ -359,7 +368,7 @@ object CallManager {
             p.c.send(msg("pairno").put("why", "declined"))
         }
         p.c.close()
-        roomsChanged()
+        devicesChanged()
         main.post { listener?.onPairRequestEnded() }
     }
 
@@ -465,20 +474,20 @@ object CallManager {
             if (ok) reply!!.optString("name").let { Peers.updateName(peer.id, it) }
             setOnline(peer.id, ok)
         }
-        // Rooms may have crossed the "really offline" line without their dot changing.
-        roomsChanged()
+        // Devices may have crossed the "really offline" line without their dot changing.
+        devicesChanged()
     }
 
     /**
      * The other tablet says it doesn't know us anymore (reset or removed us). It can't sign that
-     * without the key, so anyone could be saying it: show it as a new room to pair with again, but
+     * without the key, so anyone could be saying it: show it as a new device to pair with again, but
      * keep the key, in case the next proper connection shows that it still knows us.
      */
     private fun forgotten(peer: Peer) {
         Log.i(TAG, "${peer.name} says it doesn't know this tablet anymore")
         forgottenBy.add(peer.id)
         online.remove(peer.id)
-        roomsChanged()
+        devicesChanged()
     }
 
     private fun onMessage(c: Conn, raw: JSONObject) {
@@ -511,7 +520,7 @@ object CallManager {
                 Peers.remove(peer.id)
                 forgottenBy.remove(peer.id)
                 online.remove(peer.id)
-                roomsChanged()
+                devicesChanged()
             }
             "hello" -> onHello(c, peer, m.optString("sid"))
             "resume" -> onResumeRequest(c, peer, m.optString("sid"))
@@ -1222,12 +1231,12 @@ object CallManager {
         if (isOnline) {
             lastSeen[peerId] = System.currentTimeMillis()
             // Only set after a connection that proved the pair key.
-            if (forgottenBy.remove(peerId)) roomsChanged()
+            if (forgottenBy.remove(peerId)) devicesChanged()
         }
-        if (online.put(peerId, isOnline) != isOnline) roomsChanged()
+        if (online.put(peerId, isOnline) != isOnline) devicesChanged()
     }
 
-    private fun roomsChanged() {
-        main.post { listener?.onRoomsChanged() }
+    private fun devicesChanged() {
+        main.post { listener?.onDevicesChanged() }
     }
 }

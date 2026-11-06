@@ -24,7 +24,7 @@ import kotlin.concurrent.thread
 object Discovery {
     private const val TAG = "Discovery"
     private const val ANNOUNCE_EVERY_S = 60L
-    /** Tablets not heard from for this long are dropped from the "new rooms" list. */
+    /** Tablets not heard from for this long are dropped from the "new devices" list. */
     private const val FORGET_AFTER_MS = 3 * 60_000L
     private const val MAX_FOUND = 64
 

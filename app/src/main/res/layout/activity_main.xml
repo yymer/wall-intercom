@@ -74,9 +74,9 @@
                 android:textSize="22sp"
                 android:visibility="gone" />
 
-            <!-- One row per room (Call + Bell), built in MainActivity.rebuildRooms() -->
+            <!-- One row per device (Call + Bell), built in MainActivity.rebuildDevices() -->
             <LinearLayout
-                android:id="@+id/roomsList"
+                android:id="@+id/devicesList"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center_horizontal"

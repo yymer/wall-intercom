@@ -5,7 +5,7 @@
     <string name="state_calling">Ringer %1$s…</string>
     <string name="state_connecting">Ansluter till %1$s…</string>
     <string name="hold_for_settings">Håll in ⚙ för att öppna inställningarna</string>
-    <string name="no_folder">Inget bildalbum valt än.\n\nTryck på skärmen och håll sedan in ⚙ för att öppna inställningarna.</string>
+    <string name="no_folder">Inga bilder än.\n\nOm du vill lägga till bilder i bildspelet öppnar du en bild, trycker på Dela och väljer \"Wall Intercom\".</string>
     <string name="no_pictures">Inga bilder hittades i det valda albumet.</string>
     <string name="default_my_name">Surfplatta</string>
     <string name="err_unreachable">Kunde inte nå %1$s</string>
@@ -22,12 +22,11 @@
     <string name="my_ip">IP-adress: %1$s</string>
     <string name="ip_not_connected">(inte ansluten)</string>
     <string name="ip_unknown">(okänd)</string>
-    <string name="my_name">Namn på det här rummet (t.ex. Kök)</string>
-    <string name="port">Port (måste vara samma på alla surfplattor)</string>
+    <string name="my_name">Namn</string>
+    <string name="port">Port</string>
     <string name="h_slideshow">Bildspel</string>
-    <string name="folder_none">Bilder: (inget valt)</string>
-    <string name="folder">Bilder: mappen %1$s</string>
-    <string name="album">Bilder: albumet \"%1$s\"</string>
+    <string name="folder">Mappen %1$s</string>
+    <string name="album">Albumet \"%1$s\"</string>
     <string name="choose_album">Välj album…</string>
     <string name="no_albums">Hittade inga album med bilder på surfplattan</string>
     <string name="need_photo_permission">Appen behöver tillgång till bilder för att visa album</string>
@@ -36,7 +35,7 @@
         <item quantity="other">%d bilder</item>
     </plurals>
     <string name="choose_folder">Annan mapp…</string>
-    <string name="share_tip">Tips: för att lägga till bilder, markera dem i Foton (eller någon annan app), tryck på Dela och välj Wall Intercom. De hamnar i albumet \"Wall Intercom\".</string>
+    <string name="share_tip">Om du vill lägga till bilder i bildspelet öppnar du en bild, trycker på Dela och väljer \"Wall Intercom\".</string>
     <string name="ok">OK</string>
     <string name="share_nothing">Inget att lägga till: inga bilder delades.</string>
     <string name="share_need_permission">Wall Intercom behöver tillgång till lagringen för att spara bilderna.</string>
@@ -60,17 +59,17 @@
         <item quantity="other">%d kunde inte läggas till.</item>
     </plurals>
     <string name="slide_seconds">Sekunder per bild</string>
-    <string name="fill_screen">Fyll hela skärmen (beskär bilderna något)</string>
+    <string name="fill_screen">Fyll hela skärmen</string>
     <string name="h_screen">Skärm</string>
     <string name="idle_brightness">Ljusstyrka när bilder visas (%)</string>
     <string name="night_start">Natten börjar klockan (0–23)</string>
     <string name="night_end">Natten slutar klockan (0–23)</string>
-    <string name="night_brightness">Ljusstyrka på natten (%) – 0 släcker skärmen, tryck för att väcka den</string>
+    <string name="night_brightness">Ljusstyrka på natten (%)</string>
     <string name="h_calls">Samtal</string>
     <string name="call_volume">Samtalsvolym (%)</string>
-    <string name="max_minutes">Lägg på automatiskt efter N minuter (0 = aldrig)</string>
-    <string name="hd_video">HD-video (1280×720) – prova om surfplattorna är snabba nog</string>
-    <string name="hw_echo">Använd surfplattans inbyggda ekosläckning i stället för WebRTC:s</string>
+    <string name="max_minutes">Lägg på automatiskt efter (minuter)</string>
+    <string name="hd_video">HD-video (1280×720)</string>
+    <string name="hw_echo">Inbyggd ekosläckning</string>
     <string name="h_permissions">Behörigheter</string>
     <string name="allow_overlay">Tillåt att appen visas över andra appar</string>
     <string name="allow_battery">Låt inte Android försätta appen i viloläge</string>
@@ -90,16 +89,16 @@
     <string name="missed_call">Missat samtal från %1$s</string>
     <string name="err_declined">%1$s kan inte svara just nu</string>
     <string name="err_no_answer">%1$s svarade inte</string>
-    <string name="auto_answer">Svara automatiskt på samtal (kameran slås på utan att någon trycker på Svara)</string>
-    <string name="h_rooms">Rum</string>
-    <string name="rooms_none">Inga rum ihopparade än. Tryck på bilden på den här surfplattan: de andra surfplattorna på wifi-nätet visas där, och om du trycker på Ring eller Pling paras de ihop.</string>
-    <string name="rooms_searching">Letar efter andra surfplattor på wifi-nätet…\nWall Intercom måste vara igång på dem.</string>
-    <string name="room_new">ny</string>
+    <string name="auto_answer">Svara automatiskt på samtal</string>
+    <string name="h_paired_devices">Ihopparade enheter</string>
+    <string name="devices_none">Inga ihopparade enheter än. Andra surfplattor på wifi-nätet visas här när Wall Intercom är igång på dem.</string>
+    <string name="devices_searching">Letar efter andra surfplattor på wifi-nätet…\nWall Intercom måste vara igång på dem.</string>
+    <string name="device_new">ny</string>
     <string name="remove">Ta bort</string>
     <string name="remove_confirm">Ta bort %1$s? Surfplattorna kan inte ringa eller plinga varandra förrän de paras ihop igen.</string>
-    <string name="add_by_ip">Lägg till rum med IP-adress…</string>
+    <string name="add_by_ip">Lägg till enhet med IP-adress…</string>
     <string name="add_by_ip_hint">Behövs bara om en surfplatta inte dyker upp av sig själv (vissa routrar blockerar det).</string>
-    <string name="ip_prompt">Den andra surfplattans IP-adress (visas överst i dess inställningar)</string>
+    <string name="ip_prompt">Den andra surfplattans IP-adress (visas under Avancerade inställningar på den surfplattan)</string>
     <string name="tablet_at">surfplattan på %1$s</string>
     <string name="pair">Para ihop</string>
     <string name="accept">Godkänn</string>
@@ -116,7 +115,28 @@
     <string name="pair_request_title">%1$s vill paras ihop med den här surfplattan</string>
     <string name="pair_request_msg">Kod: %1$s\n\nGodkänn bara om %2$s visar samma kod. Sedan kan %2$s ringa och plinga den här surfplattan.</string>
     <string name="err_forgotten">%1$s känner inte igen den här surfplattan längre. Tryck på bilden för att para ihop igen.</string>
-    <string name="rooms_all_offline">Inget av de andra rummen går att nå just nu.</string>
-    <string name="auto_start">Starta automatiskt när surfplattan slås på (så att den kan ta emot samtal efter en omstart)</string>
-    <string name="use_as_home">Använd som surfplattans startskärm (hemknappen och omstarter kommer alltid tillbaka hit; för surfplattor som bara kör Wall Intercom)</string>
+    <string name="devices_all_offline">Ingen av de andra enheterna går att nå just nu.</string>
+    <string name="auto_start">Starta när surfplattan slås på</string>
+    <string name="use_as_home">Använd som surfplattans startskärm</string>
+    <string name="fill_screen_hint">Beskär bilderna något i stället för att visa svarta kanter</string>
+    <string name="night_brightness_hint">0 släcker skärmen; tryck för att väcka den</string>
+    <string name="max_minutes_hint">0 = aldrig</string>
+    <string name="hd_video_hint">Prova om surfplattorna är snabba nog</string>
+    <string name="hw_echo_hint">Använd surfplattans egen i stället för WebRTC:s. Prova om det ekar.</string>
+    <string name="auto_answer_hint">Kameran slås på utan att någon trycker på Svara</string>
+    <string name="auto_start_hint">Så att den kan ta emot samtal efter en omstart</string>
+    <string name="use_as_home_hint">Hemknappen och omstarter kommer alltid tillbaka hit. För surfplattor som bara kör Wall Intercom.</string>
+    <string name="port_hint">Måste vara samma på alla surfplattor</string>
+    <string name="h_advanced">Avancerade inställningar</string>
+    <string name="advanced_hint">Startskärm, video och ljud, nätverk</string>
+    <string name="h_network">Nätverk</string>
+    <string name="see_pictures">Se bilderna i bildspelet</string>
+    <string name="change_album">Använd ett annat album</string>
+    <string name="change_album_hint">Visa ett annat album eller en annan mapp i stället för albumet Wall Intercom</string>
+    <string name="use_default_album">Använd albumet Wall Intercom</string>
+    <string name="use_default_album_hint">Standardvalet: dit bilder du delar till Wall Intercom hamnar</string>
+    <string name="no_pictures_yet">Inga bilder här än.</string>
+    <string name="device_online">Online</string>
+    <string name="device_offline">Offline</string>
+    <string name="device_not_paired">Hittad på wifi-nätet, inte ihopparad</string>
 </resources>

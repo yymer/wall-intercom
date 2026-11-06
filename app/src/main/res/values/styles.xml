@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The settings screens: light, with the same green as the app icon and Call button. -->
+    <style name="Theme.WallIntercom.Settings" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">#25803F</item>
+        <item name="android:colorPrimaryDark">#1C6330</item>
+        <item name="android:colorAccent">#25803F</item>
+        <item name="android:windowBackground">#F1F3F2</item>
+    </style>
+</resources>

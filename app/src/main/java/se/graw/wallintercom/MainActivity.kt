@@ -41,7 +41,7 @@ class MainActivity : Activity(), CallManager.Listener {
     private lateinit var remoteView: SurfaceViewRenderer
     private lateinit var localView: SurfaceViewRenderer
     private lateinit var overlay: View
-    private lateinit var roomsList: LinearLayout
+    private lateinit var devicesList: LinearLayout
     private lateinit var callResult: TextView
     private lateinit var callPanel: View
     private lateinit var callStatus: TextView
@@ -84,7 +84,7 @@ class MainActivity : Activity(), CallManager.Listener {
         remoteView = findViewById(R.id.remoteView)
         localView = findViewById(R.id.localView)
         overlay = findViewById(R.id.overlay)
-        roomsList = findViewById(R.id.roomsList)
+        devicesList = findViewById(R.id.devicesList)
         callResult = findViewById(R.id.callResult)
         callPanel = findViewById(R.id.callPanel)
         callStatus = findViewById(R.id.callStatus)
@@ -133,7 +133,7 @@ class MainActivity : Activity(), CallManager.Listener {
         lockTaskIfDeviceOwner()
         CallManager.listener = this
         onCallState(CallManager.state, CallManager.callPeerName, null)
-        rebuildRooms()
+        rebuildDevices()
         // A pairing request that arrived while we were in the background.
         CallManager.pairRequest?.let { (name, code) -> if (pairDialog == null) onPairRequest(name, code) }
         // A bell that arrived while we were in the background (or the screen was off).
@@ -212,8 +212,8 @@ class MainActivity : Activity(), CallManager.Listener {
         }
     }
 
-    override fun onRoomsChanged() {
-        if (overlay.visibility == View.VISIBLE) rebuildRooms()
+    override fun onDevicesChanged() {
+        if (overlay.visibility == View.VISIBLE) rebuildDevices()
     }
 
     // ---------------------------------------------------------------- pairing
@@ -227,7 +227,7 @@ class MainActivity : Activity(), CallManager.Listener {
         pairDialog = PairingDialogs.request(this, name, code) { accept ->
             pairDialog = null
             CallManager.answerPairing(accept)
-            if (accept) showOverlay() // shows the new room
+            if (accept) showOverlay() // shows the new device
         }
     }
 
@@ -237,11 +237,11 @@ class MainActivity : Activity(), CallManager.Listener {
         if (overlay.visibility != View.VISIBLE && CallManager.state == CallState.IDLE) setBrightness(false)
     }
 
-    /** A new (unpaired) room was pressed: pair first, then do what was asked. */
-    private fun pairThen(room: CallManager.Room, then: (Peer) -> Unit) {
+    /** A new (unpaired) device was pressed: pair first, then do what was asked. */
+    private fun pairThen(device: CallManager.Device, then: (Peer) -> Unit) {
         handler.removeCallbacks(hideOverlayRunnable) // stay up while the dialogs are open
-        PairingDialogs.pair(this, room.ip, room.port, room.name, onPaired = { peer ->
-            rebuildRooms()
+        PairingDialogs.pair(this, device.ip, device.port, device.name, onPaired = { peer ->
+            rebuildDevices()
             then(peer)
         }, onFinished = {
             if (overlay.visibility == View.VISIBLE) showOverlay() // restart the auto-hide timer
@@ -266,24 +266,24 @@ class MainActivity : Activity(), CallManager.Listener {
         callResult.visibility = View.VISIBLE
     }
 
-    // ---------------------------------------------------------------- rooms
+    // ---------------------------------------------------------------- devices
 
-    /** Rooms whose bell button is showing "ringing". */
+    /** Devices whose bell button is showing "ringing". */
     private val ringingBells = HashSet<String>()
     private val bellButtons = HashMap<String, Button>()
-    /** Rooms that answered the last check; the others' buttons are disabled. */
-    private val onlineRooms = HashSet<String>()
+    /** Devices that answered the last check; the others' buttons are disabled. */
+    private val onlineDevices = HashSet<String>()
 
-    /** One row per room: name with an online dot, Call, Bell. New rooms pair first. */
-    private fun rebuildRooms() {
-        roomsList.removeAllViews()
+    /** One row per device: name with an online dot, Call, Bell. New devices pair first. */
+    private fun rebuildDevices() {
+        devicesList.removeAllViews()
         bellButtons.clear()
-        onlineRooms.clear()
-        val rooms = CallManager.rooms()
-        if (rooms.isEmpty()) {
-            roomsList.addView(TextView(this).apply {
-                // Paired rooms exist but none is on right now, or nothing paired/found yet.
-                setText(if (Peers.all().isNotEmpty()) R.string.rooms_all_offline else R.string.rooms_searching)
+        onlineDevices.clear()
+        val devices = CallManager.devices()
+        if (devices.isEmpty()) {
+            devicesList.addView(TextView(this).apply {
+                // Paired devices exist but none is on right now, or nothing paired/found yet.
+                setText(if (Peers.all().isNotEmpty()) R.string.devices_all_offline else R.string.devices_searching)
                 gravity = Gravity.CENTER
                 textSize = 20f
                 setTextColor(Color.WHITE)
@@ -291,19 +291,19 @@ class MainActivity : Activity(), CallManager.Listener {
             })
             return
         }
-        for (room in rooms) {
+        for (device in devices) {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(0, dp(6), 0, dp(6))
             }
-            val dotColor = if (room.online) Color.parseColor("#7CE38B") else Color.parseColor("#BBBBBB")
+            val dotColor = if (device.online) Color.parseColor("#7CE38B") else Color.parseColor("#BBBBBB")
             val label = android.text.SpannableStringBuilder()
             label.append("● ", android.text.style.ForegroundColorSpan(dotColor), 0)
-            label.append(room.name)
-            if (!room.paired) {
+            label.append(device.name)
+            if (!device.paired) {
                 label.append(
-                    "  " + getString(R.string.room_new),
+                    "  " + getString(R.string.device_new),
                     android.text.style.RelativeSizeSpan(0.7f), 0,
                 )
             }
@@ -315,16 +315,16 @@ class MainActivity : Activity(), CallManager.Listener {
                 minWidth = dp(200)
                 setPadding(0, 0, dp(20), 0)
             })
-            if (room.online) onlineRooms += room.id
+            if (device.online) onlineDevices += device.id
             val call = roundButton(R.drawable.bg_call, R.drawable.ic_stat, R.string.call_button)
             // Not reachable right now (grey dot): no calling or ringing until it's back.
-            call.setUsable(room.online, room.online)
+            call.setUsable(device.online, device.online)
             call.setOnClickListener {
-                if (room.paired) {
+                if (device.paired) {
                     hideOverlay()
-                    CallManager.dial(room.id)
+                    CallManager.dial(device.id)
                 } else {
-                    pairThen(room) { peer ->
+                    pairThen(device) { peer ->
                         hideOverlay()
                         CallManager.dial(peer.id)
                     }
@@ -332,18 +332,18 @@ class MainActivity : Activity(), CallManager.Listener {
             }
             row.addView(call)
             val bell = roundButton(
-                if (room.id in ringingBells) R.drawable.bg_bell_ringing else R.drawable.bg_bell,
+                if (device.id in ringingBells) R.drawable.bg_bell_ringing else R.drawable.bg_bell,
                 R.drawable.ic_bell, R.string.bell_button,
             )
-            bell.setUsable(room.online && room.id !in ringingBells, room.online)
+            bell.setUsable(device.online && device.id !in ringingBells, device.online)
             bell.setOnClickListener {
-                if (room.paired) ringBell(room.id) else pairThen(room) { peer -> ringBell(peer.id) }
+                if (device.paired) ringBell(device.id) else pairThen(device) { peer -> ringBell(peer.id) }
             }
             row.addView(bell, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply { marginStart = dp(16) })
-            bellButtons[room.id] = bell
-            roomsList.addView(row)
+            bellButtons[device.id] = bell
+            devicesList.addView(row)
         }
     }
 
@@ -383,19 +383,19 @@ class MainActivity : Activity(), CallManager.Listener {
     private fun setBellRinging(peerId: String, ringing: Boolean) {
         if (ringing) ringingBells += peerId else ringingBells -= peerId
         bellButtons[peerId]?.let {
-            it.setUsable(!ringing && peerId in onlineRooms, peerId in onlineRooms)
+            it.setUsable(!ringing && peerId in onlineDevices, peerId in onlineDevices)
             it.setBackgroundResource(if (ringing) R.drawable.bg_bell_ringing else R.drawable.bg_bell)
         }
     }
 
-    /** Dimmed only when the room is offline; a ringing bell is just disabled, not dimmed. */
+    /** Dimmed only when the device is offline; a ringing bell is just disabled, not dimmed. */
     private fun Button.setUsable(enabled: Boolean, online: Boolean) {
         isEnabled = enabled
         alpha = if (online) 1f else 0.4f
     }
 
     private fun showOverlay() {
-        rebuildRooms()
+        rebuildDevices()
         overlay.visibility = View.VISIBLE
         hint.alpha = 0f // don't let the "no photos" hint show through the overlay
         setBrightness(true)
@@ -490,44 +490,14 @@ class MainActivity : Activity(), CallManager.Listener {
     }
 
     private fun reloadFolder(then: () -> Unit) {
-        val albumId = prefs.albumId
-        val uri = prefs.folderUri
         io.execute {
-            val list = when {
-                albumId != null -> Albums.images(contentResolver, albumId)
-                uri != null -> listImages(Uri.parse(uri))
-                else -> emptyList()
-            }
+            val list = Albums.slideshowImages(contentResolver, prefs)
             handler.post {
                 images = list.shuffled()
                 slideIndex = 0
                 then()
             }
         }
-    }
-
-    private fun listImages(tree: Uri): List<Uri> {
-        val out = ArrayList<Uri>()
-        try {
-            val children = DocumentsContract.buildChildDocumentsUriUsingTree(
-                tree, DocumentsContract.getTreeDocumentId(tree)
-            )
-            contentResolver.query(
-                children,
-                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE),
-                null, null, null
-            )?.use { c ->
-                while (c.moveToNext()) {
-                    val mime = c.getString(1) ?: ""
-                    if (mime.startsWith("image/")) {
-                        out += DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0))
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("Slideshow", "can't list folder", e)
-        }
-        return out
     }
 
     private fun showSlide() {
