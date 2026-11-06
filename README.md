@@ -18,6 +18,11 @@ home Wi-Fi and talk directly to each other.
 [The Hay Wain](https://commons.wikimedia.org/wiki/File:John_Constable_-_The_Hay_Wain_(1821).jpg)
 by John Constable (1821), which is in the public domain.*
 
+**Built with AI:** all of the code and this README were written by AI
+([Claude Code](https://claude.com/claude-code)). The author wrote no code, but directed the work
+and tested the app on the tablets listed under [Features](#features). It hasn't had an independent
+security review, so bug reports and code reviews are very welcome.
+
 **Contents:** [Features](#features) · [Requirements](#requirements) ·
 [Set up each tablet](#set-up-each-tablet) · [Updating](#updating) ·
 [Keeping the tablets plugged in](#keeping-the-tablets-plugged-in) · [Settings](#settings) ·
