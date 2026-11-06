@@ -53,7 +53,7 @@ class Prefs(ctx: Context) {
     var nightEnd: Int get() = int("nightEndMinutes", 7 * 60); set(v) = put("nightEndMinutes", v)
     var nightBrightness: Int get() = int("nightBrightness", 2); set(v) = put("nightBrightness", v)
 
-    var callVolume: Int get() = int("callVolume", 80); set(v) = put("callVolume", v)
+    var callVolume: Int get() = int("callVolume", 70); set(v) = put("callVolume", v)
     var maxCallMinutes: Int get() = int("maxCallMinutes", 15); set(v) = put("maxCallMinutes", v)
     var hdVideo: Boolean get() = bool("hdVideo", false); set(v) = put("hdVideo", v)
     var bellVolume: Int get() = int("bellVolume", 80); set(v) = put("bellVolume", v)

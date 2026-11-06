@@ -157,7 +157,7 @@ the camera just turned on.
 | Brightness while showing pictures | 40% | Full brightness when touched or in a call |
 | Night mode | off | When on: 22:00–07:00 at 2% brightness. 0% turns the backlight off; a touch, call or bell wakes it |
 | Answer calls automatically | off | When on, incoming calls connect without anyone pressing Answer |
-| Call volume | 80% | |
+| Call volume | 70% | |
 | Bell volume | 80% | Plays on Android's *alarm* volume |
 
 Under *Advanced settings*:
@@ -282,6 +282,38 @@ You need JDK 17 or 21 and the Android SDK with platform 35. `build.sh` uses `JAV
 These are debug builds, signed with your machine's debug key. Android only installs an update
 signed with the same key as the installed app, so to switch between your own builds and the
 published ones, uninstall first. That removes the tablet's pairings, so they need pairing again.
+
+## Contributing
+
+Contributions are welcome, and you don't have to write code: bug reports, translations and hearing
+how the app runs on your tablet all help.
+
+**Reporting a bug or suggesting something:** [open an issue](https://github.com/yymer/wall-intercom/issues).
+For a bug, include the tablet model, the Android version, what happened and what you expected. The
+output of `adb logcat -d | grep CallManager` often helps too. Security problems go through
+[private reporting](https://github.com/yymer/wall-intercom/security/advisories/new) instead.
+
+**Changing the code:**
+
+1. For anything bigger than a small fix, open an issue first so we can agree on the approach.
+2. Fork the repository and make your change on a branch. [Build it yourself](#build-it-yourself)
+   and [How it works](#how-it-works) will get you started.
+3. Try it on a real tablet or in the emulator. There are no automated tests, so this is the check
+   that matters. Calls and pairing need two devices, ideally two tablets.
+4. Open a pull request saying what changed, why, and how you tested it, including the devices and
+   Android versions.
+
+A few things to keep in mind:
+
+- **Keep each pull request to one change.** Small ones are easier to review.
+- **The app supports Android 5 and up,** so check the API level of any new Android call.
+- **Text on screen goes in the string files,** in both `values/` and `values-sv/`. If you don't
+  know Swedish, say so in the pull request and it can be translated during review.
+- **In the emulator,** tablets can't find each other because broadcasts don't get through. Pair
+  from the emulator with *Advanced settings → Add device by IP address…* instead. The tablet can't
+  connect back without forwarding port 47555, so test calling from the emulator.
+
+By contributing, you agree that your contribution is licensed under the [MIT license](LICENSE).
 
 ## Publishing a release
 
