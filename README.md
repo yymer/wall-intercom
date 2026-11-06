@@ -63,7 +63,7 @@ open an issue with how it goes on yours.
    - *Name*: what the other tablets call this one, e.g. `Kitchen`.
    - Turn on *Start when the tablet is turned on*, so it can take calls again after a restart
      or power cut (off by default).
-   - *See the pictures in the slideshow* shows what's in it. Optional: *Use a different album*
+   - *See the pictures in the slideshow* shows what's in it; tap one to see it full size. Optional: *Use a different album*
      shows another album on the tablet instead (e.g. Camera), or any folder, e.g. on an SD card.
    - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*
      (Android 6 and newer; Android 5 doesn't have these).
@@ -219,7 +219,7 @@ adb logcat -d | grep CallManager
 - `Albums`: lists the tablet's photo albums from Android's media library, and copies shared
   photos into the app's own album.
 - `ShareActivity`: the *Share → Wall Intercom* target.
-- `SettingsActivity`: the settings form and its pages. `PicturesActivity`: the pictures in the slideshow.
+- `SettingsActivity`: the settings form and its pages. `PicturesActivity`: the pictures in the slideshow. `PhotosApp`: opens the tablet's photos app.
 - Translations are in `app/src/main/res/values*/strings.xml`. To add a language, copy
   `values/strings.xml` to `values-xx/` and translate it.
 

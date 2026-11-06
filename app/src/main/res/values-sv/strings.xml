@@ -139,4 +139,6 @@
     <string name="device_online">Online</string>
     <string name="device_offline">Offline</string>
     <string name="device_not_paired">Hittad på wifi-nätet, inte ihopparad</string>
+    <string name="open_photos">Öppna bildappen</string>
+    <string name="no_photos_app">Hittade ingen app som kan visa bilder</string>
 </resources>

@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.util.LruCache
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
@@ -41,6 +42,10 @@ class PicturesActivity : Activity() {
             verticalSpacing = dp(4)
             setPadding(dp(4), dp(4), dp(4), dp(4))
             clipToPadding = false
+            setDrawSelectorOnTop(true)
+            setOnItemClickListener { parent, _, position, _ ->
+                PhotosApp.viewPicture(this@PicturesActivity, parent.getItemAtPosition(position) as Uri)
+            }
         }
         empty = TextView(this).apply {
             setText(R.string.no_pictures_yet)
@@ -68,9 +73,20 @@ class PicturesActivity : Activity() {
         if (requestCode == REQ_READ) load()
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        if (PhotosApp.intent(this) != null) {
+            menu.add(Menu.NONE, MENU_OPEN_PHOTOS, Menu.NONE, R.string.open_photos)
+                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS or MenuItem.SHOW_AS_ACTION_WITH_TEXT)
+        }
+        return true
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId != android.R.id.home) return super.onOptionsItemSelected(item)
-        finish()
+        when (item.itemId) {
+            android.R.id.home -> finish()
+            MENU_OPEN_PHOTOS -> PhotosApp.intent(this)?.let { PhotosApp.open(this, it) }
+            else -> return super.onOptionsItemSelected(item)
+        }
         return true
     }
 
@@ -119,5 +135,6 @@ class PicturesActivity : Activity() {
 
     companion object {
         private const val REQ_READ = 1
+        private const val MENU_OPEN_PHOTOS = 1
     }
 }

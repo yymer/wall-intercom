@@ -91,7 +91,7 @@ class SettingsActivity : Activity() {
 
     private fun buildMainPage() {
         section(R.string.h_slideshow) {
-            infoRow(getString(R.string.share_tip))
+            shareTipRow()
             picturesSummary = navRow(R.string.see_pictures, "") {
                 startActivity(Intent(this, PicturesActivity::class.java))
             }
@@ -581,6 +581,24 @@ class SettingsActivity : Activity() {
         theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
         setBackgroundResource(ripple.resourceId)
         setOnClickListener { onClick() }
+    }
+
+    /** How to add photos, with a link to the app they're in. */
+    private fun shareTipRow() {
+        val photos = PhotosApp.intent(this) ?: return infoRow(getString(R.string.share_tip))
+        val r = row()
+        r.addView(
+            rowText(getString(R.string.share_tip), 16f, TEXT_PRIMARY),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        r.addView(Button(this, null, android.R.attr.borderlessButtonStyle).apply {
+            setText(R.string.open_photos)
+            textSize = 16f
+            isAllCaps = false
+            setTextColor(GREEN)
+            setOnClickListener { PhotosApp.open(this@SettingsActivity, photos) }
+        })
+        col.addView(r)
     }
 
     private fun infoRow(text: String) {

@@ -140,4 +140,6 @@
     <string name="device_online">Online</string>
     <string name="device_offline">Offline</string>
     <string name="device_not_paired">Found on the Wi-Fi, not paired</string>
+    <string name="open_photos">Open photos app</string>
+    <string name="no_photos_app">No app found that can show pictures</string>
 </resources>
