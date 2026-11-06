@@ -66,8 +66,10 @@ object PairingDialogs {
                     Link.PairFailure.TIMEOUT -> act.getString(R.string.pair_timeout, n)
                     Link.PairFailure.VERSION -> act.getString(R.string.pair_version, n)
                 }
+                val title = if (why == Link.PairFailure.UNREACHABLE) act.getString(R.string.pair_unreachable_title) else null
                 if (!act.isFinishing) {
-                    AlertDialog.Builder(act).setMessage(text).setPositiveButton(R.string.ok, null).show().bigText()
+                    AlertDialog.Builder(act).setTitle(title).setMessage(text)
+                        .setPositiveButton(R.string.ok, null).show().bigText()
                 }
                 onFinished()
             }.let {}

@@ -118,7 +118,8 @@
     <string name="pair_contacting">Contacting %1$s…</string>
     <string name="pair_waiting">Code: %1$s\n\nWaiting for someone at %2$s to press Accept. Check that it shows the same code.</string>
     <string name="pair_ok">Paired with %1$s</string>
-    <string name="pair_unreachable">Could not pair with device. Make sure the device is online and is accepting pairing requests.</string>
+    <string name="pair_unreachable_title">Could not pair with device</string>
+    <string name="pair_unreachable">Make sure the device is online and is accepting pairing requests.</string>
     <string name="pair_declined">%1$s declined.</string>
     <string name="pair_busy">%1$s is busy right now. Try again in a moment.</string>
     <string name="pair_already">%1$s is already pairing with another tablet. Try again in a moment.</string>
