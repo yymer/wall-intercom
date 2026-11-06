@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.TimePickerDialog
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -199,15 +200,11 @@ class SettingsActivity : Activity() {
         section(R.string.h_this_device) {
             switchRow(R.string.use_as_home, R.string.use_as_home_hint, Prefs.HomeScreen.isEnabled(this)) {
                 Prefs.HomeScreen.setEnabled(this, it)
+                // Android keeps the home app it already has, without asking, until someone picks another.
+                if (it) openAndroidSettings(Settings.ACTION_HOME_SETTINGS)
             }
             // The way out of the locked-down kiosk mode (see README), where nothing else leads here.
-            navRow(R.string.open_android_settings) {
-                try {
-                    stopLockTask()
-                } catch (_: Exception) {
-                }
-                startActivity(Intent(Settings.ACTION_SETTINGS))
-            }
+            navRow(R.string.open_android_settings) { openAndroidSettings(Settings.ACTION_SETTINGS) }
         }
         section(R.string.h_calls) {
             intRow(R.string.max_minutes, R.string.max_minutes_hint, prefs.maxCallMinutes, 0..1440) {
@@ -706,6 +703,20 @@ class SettingsActivity : Activity() {
         r.clickable { s.toggle() }
         col.addView(r)
         s.setOnCheckedChangeListener { _, on -> save(on) }
+    }
+
+    /** Opens a page of Android's settings, or their first page if this tablet doesn't have that one. */
+    private fun openAndroidSettings(action: String) {
+        // In the locked-down kiosk mode, other apps can't open until it's unpinned.
+        try {
+            stopLockTask()
+        } catch (_: Exception) {
+        }
+        try {
+            startActivity(Intent(action))
+        } catch (_: ActivityNotFoundException) {
+            startActivity(Intent(Settings.ACTION_SETTINGS))
+        }
     }
 
     /** A time of day, in minutes after midnight, chosen with Android's own clock. */
