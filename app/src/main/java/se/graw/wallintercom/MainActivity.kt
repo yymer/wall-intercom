@@ -425,8 +425,9 @@ class MainActivity : Activity(), CallManager.Listener {
     private fun setBrightness(active: Boolean) {
         val lp = window.attributes
         lp.screenBrightness = if (active) 1f else {
-            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-            val pct = if (prefs.isNight(hour)) prefs.nightBrightness else prefs.idleBrightness
+            val now = Calendar.getInstance()
+            val minuteOfDay = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+            val pct = if (prefs.isNight(minuteOfDay)) prefs.nightBrightness else prefs.idleBrightness
             pct.coerceIn(0, 100) / 100f
         }
         window.attributes = lp

@@ -42,8 +42,10 @@ class Prefs(ctx: Context) {
     var fillScreen: Boolean get() = bool("fillScreen", true); set(v) = put("fillScreen", v)
 
     var idleBrightness: Int get() = int("idleBrightness", 40); set(v) = put("idleBrightness", v)
-    var nightStart: Int get() = int("nightStart", 22); set(v) = put("nightStart", v)
-    var nightEnd: Int get() = int("nightEnd", 7); set(v) = put("nightEnd", v)
+    var nightMode: Boolean get() = bool("nightMode", false); set(v) = put("nightMode", v)
+    /** When night starts and ends, in minutes after midnight. */
+    var nightStart: Int get() = int("nightStartMinutes", 22 * 60); set(v) = put("nightStartMinutes", v)
+    var nightEnd: Int get() = int("nightEndMinutes", 7 * 60); set(v) = put("nightEndMinutes", v)
     var nightBrightness: Int get() = int("nightBrightness", 2); set(v) = put("nightBrightness", v)
 
     var callVolume: Int get() = int("callVolume", 80); set(v) = put("callVolume", v)
@@ -77,13 +79,14 @@ class Prefs(ctx: Context) {
         }
     }
 
-    fun isNight(hour: Int): Boolean {
+    fun isNight(minuteOfDay: Int): Boolean {
+        if (!nightMode) return false
         val s = nightStart
         val e = nightEnd
         return when {
             s == e -> false
-            s < e -> hour in s until e
-            else -> hour >= s || hour < e
+            s < e -> minuteOfDay in s until e
+            else -> minuteOfDay >= s || minuteOfDay < e
         }
     }
 }

@@ -23,7 +23,7 @@ and talk directly to each other.
   (for up to 30 s) instead of hanging up.
 - Calls hang up automatically after 15 minutes (configurable), so a forgotten call doesn't
   leave a camera on all night.
-- Dims at night, keeps itself running, and can start by itself after a reboot (optional), or
+- Can dim at night, keeps itself running, and can start by itself after a reboot (optional), or
   act as the tablet's home screen on a tablet used only for this.
 - English and Swedish, following each tablet's language setting.
 
@@ -61,15 +61,15 @@ open an issue with how it goes on yours.
    which the slideshow shows by default. Sharing the same photo twice doesn't copy it again.
 3. Open **Wall Intercom**. Tap the screen, then **press and hold ⚙** (top right) for settings:
    - *Name*: what the other tablets call this one, e.g. `Kitchen`.
-   - Turn on *Start when the tablet is turned on*, so it can take calls again after a restart
+   - Turn on *Start when the device is turned on*, so it can take calls again after a restart
      or power cut (off by default).
-   - *See the pictures in the slideshow* shows what's in it; tap one to see it full size. Optional: *Use a different album*
+   - *See the pictures in the slideshow* shows what's in it; tap one to see it full size. Optional: *Change album or folder*
      shows another album on the tablet instead (e.g. Camera), or any folder, e.g. on an SD card.
    - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*
      (Android 6 and newer; Android 5 doesn't have these).
 
    Changes are saved as you make them.
-4. Optional, for a tablet that only runs Wall Intercom: turn on *Use as the tablet's home screen*
+4. Optional, for a tablet that only runs Wall Intercom: turn on *Use as home screen*
    in *Advanced settings*, then press the Home button and choose **Wall Intercom → Always**. The Home
    button and restarts then always come back to it. (Off by default, so it doesn't compete with
    the tablet's normal launcher.)
@@ -128,7 +128,7 @@ device by IP address are under *Advanced settings*.
 | Seconds per picture | 20 | Photos are shuffled; the album is re-scanned every round |
 | Fill the whole screen | on | Crops pictures slightly instead of showing black bars |
 | Brightness while showing pictures | 40% | Full brightness when touched or in a call |
-| Night hours / night brightness | 22–07, 2% | 0% turns the backlight off; a touch, call or bell wakes it |
+| Night mode | off (22:00–07:00, 2% when on) | 0% turns the backlight off; a touch, call or bell wakes it |
 | Start automatically | off | Starts the app when the tablet is turned on. On Android 10, showing the screen at boot also needs *Allow waking up over other apps*; without it only the call listener starts |
 | Answer calls automatically | off | When on, incoming calls connect without anyone pressing Answer |
 | Call volume | 80% | |

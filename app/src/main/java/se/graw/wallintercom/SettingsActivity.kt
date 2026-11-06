@@ -3,6 +3,7 @@ package se.graw.wallintercom
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -19,6 +20,7 @@ import android.os.PowerManager
 import android.provider.DocumentsContract
 import android.provider.Settings
 import android.text.InputType
+import android.text.format.DateFormat
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MenuItem
@@ -36,6 +38,7 @@ import android.widget.TextView
 import android.widget.Toast
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.util.Calendar
 
 /**
  * The settings: one main page, plus pages for what most people never need. Everything is saved as
@@ -95,14 +98,14 @@ class SettingsActivity : Activity() {
     private fun buildMainPage() {
         section(R.string.h_slideshow) {
             shareTipRow()
+            navRow(R.string.change_album, getString(R.string.change_album_hint)) { show(albumPage) }
             picturesSummary = navRow(R.string.see_pictures, "") {
                 startActivity(Intent(this, PicturesActivity::class.java))
             }
             intRow(R.string.slide_seconds, null, prefs.slideSeconds, 5..86400) { prefs.slideSeconds = it }
             switchRow(R.string.fill_screen, R.string.fill_screen_hint, prefs.fillScreen) { prefs.fillScreen = it }
-            navRow(R.string.change_album, getString(R.string.change_album_hint)) { show(albumPage) }
         }
-        section(R.string.h_this_tablet) {
+        section(R.string.h_this_device) {
             textRow(R.string.my_name, prefs.myName) { typed ->
                 typed.trim().ifEmpty { getString(R.string.default_my_name) }.also { prefs.myName = it }
             }
@@ -114,11 +117,21 @@ class SettingsActivity : Activity() {
         }
         section(R.string.h_screen) {
             intRow(R.string.idle_brightness, null, prefs.idleBrightness, 0..100) { prefs.idleBrightness = it }
-            intRow(R.string.night_start, null, prefs.nightStart, 0..23) { prefs.nightStart = it }
-            intRow(R.string.night_end, null, prefs.nightEnd, 0..23) { prefs.nightEnd = it }
+            val nightRows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.withDividers()
+            nightRows.visibility = if (prefs.nightMode) View.VISIBLE else View.GONE
+            switchRow(R.string.night_mode, R.string.night_mode_hint, prefs.nightMode) { on ->
+                prefs.nightMode = on
+                nightRows.visibility = if (on) View.VISIBLE else View.GONE
+            }
+            col.addView(nightRows)
+            val card = col
+            col = nightRows
+            timeRow(R.string.night_start, prefs.nightStart) { prefs.nightStart = it }
+            timeRow(R.string.night_end, prefs.nightEnd) { prefs.nightEnd = it }
             intRow(R.string.night_brightness, R.string.night_brightness_hint, prefs.nightBrightness, 0..100) {
                 prefs.nightBrightness = it
             }
+            col = card
         }
         section(R.string.h_calls) {
             switchRow(R.string.auto_answer, R.string.auto_answer_hint, prefs.autoAnswer) { prefs.autoAnswer = it }
@@ -173,7 +186,7 @@ class SettingsActivity : Activity() {
     }
 
     private fun buildAdvancedPage() {
-        section(R.string.h_this_tablet) {
+        section(R.string.h_this_device) {
             switchRow(R.string.use_as_home, R.string.use_as_home_hint, Prefs.HomeScreen.isEnabled(this)) {
                 Prefs.HomeScreen.setEnabled(this, it)
             }
@@ -519,19 +532,22 @@ class SettingsActivity : Activity() {
                 cornerRadius = dp(12).toFloat()
             }
             elevation = dp(1).toFloat()
-            showDividers = LinearLayout.SHOW_DIVIDER_MIDDLE
-            dividerDrawable = GradientDrawable().apply {
-                setColor(DIVIDER)
-                setSize(1, 1)
-            }
             clipToOutline = true
-        }
+        }.withDividers()
         col = card
         build()
         col = outer
         outer.addView(card, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
         ).apply { if (title == null) topMargin = dp(20) })
+    }
+
+    private fun LinearLayout.withDividers() = apply {
+        showDividers = LinearLayout.SHOW_DIVIDER_MIDDLE
+        dividerDrawable = GradientDrawable().apply {
+            setColor(DIVIDER)
+            setSize(1, 1)
+        }
     }
 
     private fun divider() = View(this).apply {
@@ -652,6 +668,31 @@ class SettingsActivity : Activity() {
         r.clickable { s.toggle() }
         col.addView(r)
         s.setOnCheckedChangeListener { _, on -> save(on) }
+    }
+
+    /** A time of day, in minutes after midnight, chosen with Android's own clock. */
+    private fun timeRow(title: Int, value: Int, save: (Int) -> Unit) {
+        var minutes = value
+        val r = row()
+        r.addTitle(title, null)
+        val shown = rowText(timeText(minutes), 18f, TEXT_PRIMARY)
+        r.addView(shown)
+        r.clickable {
+            TimePickerDialog(this, { _, hour, minute ->
+                minutes = hour * 60 + minute
+                save(minutes)
+                shown.text = timeText(minutes)
+            }, minutes / 60, minutes % 60, DateFormat.is24HourFormat(this)).show()
+        }
+        col.addView(r)
+    }
+
+    private fun timeText(minutes: Int): String {
+        val time = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, minutes / 60)
+            set(Calendar.MINUTE, minutes % 60)
+        }
+        return DateFormat.getTimeFormat(this).format(time.time)
     }
 
     /** A row that opens something. Returns its hint line, to change it later. */
