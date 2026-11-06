@@ -77,7 +77,7 @@ open an issue with how it goes on yours.
    behind the lock screen. With a PIN, pattern or password, Android keeps apps' data locked
    after a restart until someone unlocks the tablet, so Wall Intercom can't start by itself.
 6. Pair the tablets: touch the photo, and press **Call** or **Bell** next to a tablet marked
-   *new* (or press **Pair** under *Paired devices* in settings). Check that both tablets show the
+   *new* (or press **Pair** under *Available devices* in settings). Check that both tablets show the
    same code and press **Accept** on the other one. With more than two tablets, pair each two
    that should be able to call each other. (If a tablet never shows up, use *Advanced settings →
    Add device by IP address…*.)
@@ -132,7 +132,7 @@ device by IP address are under *Advanced settings*.
 | Start automatically | off | Starts the app when the tablet is turned on. On Android 10, showing the screen at boot also needs *Allow waking up over other apps*; without it only the call listener starts |
 | Answer calls automatically | off | When on, incoming calls connect without anyone pressing Answer |
 | Allow pairing requests | on | When off, requests are dropped: nothing shows here, and the other tablet just can't reach this one. Pairings already made keep working |
-| Hide unpaired devices | off | Keeps them off the main screen. They're still in the settings, for pairing from there |
+| Hide unpaired devices | off | Keeps them off the main screen. They're still under *Available devices* in the settings, for pairing from there |
 | Call volume | 80% | |
 | Bell volume | 80% | Plays on Android's *alarm* volume channel |
 | Hang up automatically after | 15 min | 0 = never |

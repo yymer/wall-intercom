@@ -93,11 +93,14 @@
     <string name="err_no_answer">%1$s svarade inte</string>
     <string name="auto_answer">Svara automatiskt på samtal</string>
     <string name="h_paired_devices">Ihopparade enheter</string>
-    <string name="devices_none">Inga ihopparade enheter än. Andra enheter på wifi-nätet visas här när Wall Intercom är igång på dem.</string>
+    <string name="h_available_devices">Tillgängliga enheter</string>
+    <string name="h_pairing_settings">Parningsinställningar</string>
+    <string name="paired_none">Inga ihopparade enheter än.</string>
+    <string name="available_none">Hittade inga andra enheter. De visas här när Wall Intercom är igång på dem, på samma wifi-nät.</string>
     <string name="allow_pairing">Tillåt förfrågningar om ihopparning</string>
     <string name="allow_pairing_hint">När det är av ignoreras förfrågningar från andra enheter utan att något visas här</string>
     <string name="hide_unpaired">Dölj enheter som inte är ihopparade</string>
-    <string name="hide_unpaired_hint">På huvudskärmen. De visas fortfarande här.</string>
+    <string name="hide_unpaired_hint">På huvudskärmen. De visas fortfarande under Tillgängliga enheter.</string>
     <string name="devices_none_hidden">Inga ihopparade enheter än. Para ihop enheter i inställningarna.</string>
     <string name="devices_searching">Letar efter andra enheter på wifi-nätet…\nWall Intercom måste vara igång på dem.</string>
     <string name="device_new">ny</string>
@@ -146,7 +149,7 @@
     <string name="no_pictures_yet">Inga bilder här än.</string>
     <string name="device_online">Online</string>
     <string name="device_offline">Offline</string>
-    <string name="device_not_paired">Hittad på wifi-nätet, inte ihopparad</string>
+    <string name="device_not_paired">Hittad på wifi-nätet</string>
     <string name="open_photos">Öppna bildappen</string>
     <string name="no_photos_app">Hittade ingen app som kan visa bilder</string>
 </resources>

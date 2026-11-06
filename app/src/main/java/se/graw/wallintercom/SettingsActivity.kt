@@ -59,7 +59,8 @@ class SettingsActivity : Activity() {
     private lateinit var resetAlbum: View
     private var overlayState: TextView? = null
     private var batteryState: TextView? = null
-    private lateinit var devicesCol: LinearLayout
+    private lateinit var pairedCol: LinearLayout
+    private lateinit var availableCol: LinearLayout
     private var shownDevices: List<CallManager.Device>? = null
 
     /** Save what's typed in each text field. */
@@ -115,8 +116,14 @@ class SettingsActivity : Activity() {
             switchRow(R.string.auto_start, R.string.auto_start_hint, prefs.autoStart) { prefs.autoStart = it }
         }
         section(R.string.h_paired_devices) {
-            devicesCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            col.addView(devicesCol)
+            pairedCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            col.addView(pairedCol)
+        }
+        section(R.string.h_available_devices) {
+            availableCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            col.addView(availableCol)
+        }
+        section(R.string.h_pairing_settings) {
             switchRow(R.string.allow_pairing, R.string.allow_pairing_hint, prefs.allowPairing) { prefs.allowPairing = it }
             switchRow(R.string.hide_unpaired, R.string.hide_unpaired_hint, prefs.hideUnpaired) { prefs.hideUnpaired = it }
         }
@@ -338,16 +345,21 @@ class SettingsActivity : Activity() {
         val devices = CallManager.allDevices()
         if (!force && devices == shownDevices) return
         shownDevices = devices
-        devicesCol.removeAllViews()
+        fillDevices(pairedCol, devices.filter { it.paired }, R.string.paired_none)
+        fillDevices(availableCol, devices.filter { !it.paired }, R.string.available_none)
+    }
+
+    private fun fillDevices(list: LinearLayout, devices: List<CallManager.Device>, none: Int) {
+        list.removeAllViews()
         if (devices.isEmpty()) {
-            devicesCol.addView(rowText(getString(R.string.devices_none), 16f, TEXT_SECONDARY).apply {
+            list.addView(rowText(getString(none), 16f, TEXT_SECONDARY).apply {
                 setPadding(dp(16), dp(14), dp(16), dp(14))
             })
             return
         }
         devices.forEachIndexed { i, d ->
-            if (i > 0) devicesCol.addView(divider())
-            devicesCol.addView(deviceRow(d))
+            if (i > 0) list.addView(divider())
+            list.addView(deviceRow(d))
         }
     }
 
