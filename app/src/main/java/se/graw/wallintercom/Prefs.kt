@@ -82,6 +82,14 @@ class Prefs(ctx: Context) {
                 android.content.pm.PackageManager.DONT_KILL_APP,
             )
         }
+
+        /** Whether this is what the Home button opens now. Being offered as a Home app isn't enough. */
+        fun isCurrent(ctx: Context): Boolean {
+            val home = android.content.Intent(android.content.Intent.ACTION_MAIN)
+                .addCategory(android.content.Intent.CATEGORY_HOME)
+            return ctx.packageManager.resolveActivity(home, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.packageName == ctx.packageName
+        }
     }
 
     fun isNight(minuteOfDay: Int): Boolean {

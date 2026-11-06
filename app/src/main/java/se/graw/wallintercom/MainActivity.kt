@@ -128,6 +128,14 @@ class MainActivity : Activity(), CallManager.Listener {
 
     override fun onResume() {
         super.onResume()
+        // Opened as the Home app, which has been turned off since: carry on as the normal app.
+        if (componentName.className.endsWith(".HomeScreen") && !Prefs.HomeScreen.isEnabled(this) &&
+            CallManager.state == CallState.IDLE
+        ) {
+            finish()
+            startActivity(Intent(this, MainActivity::class.java))
+            return
+        }
         resumed = true
         hideSystemUi()
         lockTaskIfDeviceOwner()
@@ -169,8 +177,14 @@ class MainActivity : Activity(), CallManager.Listener {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // This is the home screen: Back does nothing except close the overlay.
-        hideOverlay()
+        when {
+            overlay.visibility == View.VISIBLE || message.visibility == View.VISIBLE -> hideOverlay()
+            CallManager.state != CallState.IDLE -> Unit
+            // As the home screen there's nothing to go back to. Otherwise, leave like any other app.
+            !Prefs.HomeScreen.isCurrent(this) -> startActivity(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
     }
 
     // ---------------------------------------------------------------- call UI
