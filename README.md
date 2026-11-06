@@ -1,6 +1,6 @@
 # Wall Intercom
 
-Turn old Android tablets into wall-mounted **photo frames that double as a video intercom**
+Turn old (or new) Android tablets into wall-mounted **photo frames that double as a video intercom**
 between rooms. There's no server, no cloud and no account: the tablets find each other on your
 home Wi-Fi and talk directly to each other.
 
