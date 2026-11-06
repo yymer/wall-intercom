@@ -76,9 +76,7 @@
     <string name="allow_battery">Don\'t let Android put this app to sleep</string>
     <string name="already_allowed">Already allowed</string>
     <string name="open_android_settings">Open Android settings</string>
-    <string name="save">Save</string>
     <string name="cancel">Cancel</string>
-    <string name="saved">Saved</string>
     <string name="bell_button">Bell</string>
     <string name="bell_from">🔔 Bell from %1$s</string>
     <string name="bell_volume">Bell volume (%)</string>

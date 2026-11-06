@@ -75,9 +75,7 @@
     <string name="allow_battery">Låt inte Android försätta appen i viloläge</string>
     <string name="already_allowed">Redan tillåtet</string>
     <string name="open_android_settings">Öppna Androids inställningar</string>
-    <string name="save">Spara</string>
     <string name="cancel">Avbryt</string>
-    <string name="saved">Sparat</string>
     <string name="bell_button">Pling</string>
     <string name="bell_from">🔔 Det plingar från %1$s</string>
     <string name="bell_volume">Volym för pling (%)</string>

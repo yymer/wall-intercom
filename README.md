@@ -67,7 +67,8 @@ open an issue with how it goes on yours.
      shows another album on the tablet instead (e.g. Camera), or any folder, e.g. on an SD card.
    - Press *Allow waking up over other apps* and *Don't let Android put this app to sleep*
      (Android 6 and newer; Android 5 doesn't have these).
-   - **Save**.
+
+   Changes are saved as you make them.
 4. Optional, for a tablet that only runs Wall Intercom: turn on *Use as the tablet's home screen*
    in *Advanced settings*, then press the Home button and choose **Wall Intercom → Always**. The Home
    button and restarts then always come back to it. (Off by default, so it doesn't compete with

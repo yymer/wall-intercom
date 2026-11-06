@@ -5,7 +5,6 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -25,6 +24,7 @@ import android.view.Gravity
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.EditText
@@ -38,8 +38,8 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 
 /**
- * The settings: one main page, plus pages for what most people never need. All pages are part of
- * the same form, so Save and Cancel at the bottom cover everything on them.
+ * The settings: one main page, plus pages for what most people never need. Everything is saved as
+ * it's changed; text fields when you leave them, or the screen.
  */
 class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -56,7 +56,11 @@ class SettingsActivity : Activity() {
     private lateinit var devicesCol: LinearLayout
     private var shownDevices: List<CallManager.Device>? = null
 
-    private val savers = mutableListOf<() -> Unit>()
+    /** Save what's typed in each text field. */
+    private val fields = mutableListOf<() -> Unit>()
+    /** What the listener and the other tablets know about: these only change when leaving settings. */
+    private var appliedPort = 0
+    private var appliedName = ""
     private val handler = Handler(Looper.getMainLooper())
     private val refreshDevices = object : Runnable {
         override fun run() {
@@ -68,6 +72,8 @@ class SettingsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
+        appliedPort = prefs.port
+        appliedName = prefs.myName
         CallManager.init(this)
 
         mainPage = newPage()
@@ -81,11 +87,8 @@ class SettingsActivity : Activity() {
         buildAdvancedPage()
 
         scroll = ScrollView(this)
-        setContentView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-            addView(saveBar())
-        })
+        setContentView(scroll)
+        actionBar?.setDisplayHomeAsUpEnabled(true)
         show(mainPage)
     }
 
@@ -100,8 +103,8 @@ class SettingsActivity : Activity() {
             navRow(R.string.change_album, getString(R.string.change_album_hint)) { show(albumPage) }
         }
         section(R.string.h_this_tablet) {
-            textRow(R.string.my_name, prefs.myName) {
-                prefs.myName = it.trim().ifEmpty { getString(R.string.default_my_name) }
+            textRow(R.string.my_name, prefs.myName) { typed ->
+                typed.trim().ifEmpty { getString(R.string.default_my_name) }.also { prefs.myName = it }
             }
             switchRow(R.string.auto_start, R.string.auto_start_hint, prefs.autoStart) { prefs.autoStart = it }
         }
@@ -189,30 +192,6 @@ class SettingsActivity : Activity() {
         }
     }
 
-    private fun saveBar() = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.END or Gravity.CENTER_VERTICAL
-        setBackgroundColor(Color.WHITE)
-        elevation = dp(8).toFloat()
-        setPadding(dp(16), dp(8), dp(16), dp(8))
-        addView(Button(context, null, android.R.attr.borderlessButtonStyle).apply {
-            setText(R.string.cancel)
-            textSize = 18f
-            isAllCaps = false
-            setOnClickListener { finish() }
-        })
-        addView(Button(context).apply {
-            setText(R.string.save)
-            textSize = 18f
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            backgroundTintList = ColorStateList.valueOf(GREEN)
-            setOnClickListener { save() }
-        }, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT,
-        ).apply { marginStart = dp(8) })
-    }
-
     // ---------------------------------------------------------------- pages
 
     private fun newPage() = LinearLayout(this).apply {
@@ -227,6 +206,7 @@ class SettingsActivity : Activity() {
         scroll.addView(target)
         scroll.scrollTo(0, 0)
         target.requestFocus()
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(scroll.windowToken, 0)
         fitToScreen()
         setTitle(
             when (target) {
@@ -235,7 +215,6 @@ class SettingsActivity : Activity() {
                 else -> R.string.settings_title
             }
         )
-        actionBar?.setDisplayHomeAsUpEnabled(target !== mainPage)
     }
 
     /** On a big tablet, keep the form at a readable width instead of stretching it. */
@@ -256,7 +235,7 @@ class SettingsActivity : Activity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId != android.R.id.home) return super.onOptionsItemSelected(item)
-        show(mainPage)
+        if (page !== mainPage) show(mainPage) else finish()
         return true
     }
 
@@ -270,15 +249,19 @@ class SettingsActivity : Activity() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(refreshDevices)
+        applyChanges()
     }
 
-    private fun save() {
-        val oldPort = prefs.port
-        savers.forEach { it() }
-        if (prefs.port != oldPort) CallManager.restartListener()
+    /** Saves the text fields, and tells the network if the port or the name changed. */
+    private fun applyChanges() {
+        fields.forEach { it() }
+        val port = prefs.port
+        val name = prefs.myName
+        if (port == appliedPort && name == appliedName) return
+        if (port != appliedPort) CallManager.restartListener()
         CallManager.pingNow()
-        toast(getString(R.string.saved))
-        finish()
+        appliedPort = port
+        appliedName = name
     }
 
     @Deprecated("Deprecated in Java")
@@ -369,6 +352,7 @@ class SettingsActivity : Activity() {
     }
 
     private fun pair(ip: String, port: Int, name: String?) {
+        applyChanges()
         PairingDialogs.pair(this, ip, port, name, onPaired = { rebuildDevices(force = true) })
     }
 
@@ -384,7 +368,10 @@ class SettingsActivity : Activity() {
             .setView(input)
             .setPositiveButton(R.string.pair) { _, _ ->
                 val ip = input.text.toString().trim()
-                if (ip.isNotEmpty()) pair(ip, prefs.port, null)
+                if (ip.isNotEmpty()) {
+                    applyChanges()
+                    pair(ip, prefs.port, null)
+                }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -392,7 +379,7 @@ class SettingsActivity : Activity() {
 
     // ---------------------------------------------------------------- albums
 
-    /** A new album or folder was chosen (these take effect right away, like before). */
+    /** A new album or folder was chosen. */
     private fun sourceChanged() {
         refreshSource()
         show(mainPage)
@@ -605,7 +592,14 @@ class SettingsActivity : Activity() {
         col.addView(rowText(text, 16f, TEXT_PRIMARY).apply { setPadding(dp(16), dp(14), dp(16), dp(14)) })
     }
 
-    private fun textRow(title: Int, value: String, save: (String) -> Unit) {
+    /** Saves when you leave the field or the screen, not on every key: 15 is 1 on the way there. */
+    private fun EditText.saveOnLeave(save: () -> Unit) {
+        setOnFocusChangeListener { _, focused -> if (!focused) save() }
+        fields += save
+    }
+
+    /** [save] returns what was stored, which the field then shows. */
+    private fun textRow(title: Int, value: String, save: (String) -> String) {
         val r = row()
         r.addTitle(title, null)
         val e = EditText(this).apply {
@@ -617,7 +611,10 @@ class SettingsActivity : Activity() {
         }
         r.addView(e, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.5f))
         col.addView(r)
-        savers += { save(e.text.toString()) }
+        e.saveOnLeave {
+            val stored = save(e.text.toString())
+            if (e.text.toString() != stored) e.setText(stored)
+        }
     }
 
     private fun intRow(title: Int, hint: Int?, value: Int, range: IntRange, save: (Int) -> Unit) {
@@ -633,7 +630,15 @@ class SettingsActivity : Activity() {
         }
         r.addView(e, LinearLayout.LayoutParams(dp(96), LinearLayout.LayoutParams.WRAP_CONTENT))
         col.addView(r)
-        savers += { e.text.toString().trim().toIntOrNull()?.let { save(it.coerceIn(range)) } }
+        var stored = value
+        e.saveOnLeave {
+            val typed = e.text.toString().trim().toIntOrNull()?.coerceIn(range) ?: stored
+            if (typed != stored) {
+                save(typed)
+                stored = typed
+            }
+            if (e.text.toString() != typed.toString()) e.setText(typed.toString())
+        }
     }
 
     private fun switchRow(title: Int, hint: Int?, value: Boolean, save: (Boolean) -> Unit) {
@@ -646,7 +651,7 @@ class SettingsActivity : Activity() {
         r.addView(s)
         r.clickable { s.toggle() }
         col.addView(r)
-        savers += { save(s.isChecked) }
+        s.setOnCheckedChangeListener { _, on -> save(on) }
     }
 
     /** A row that opens something. Returns its hint line, to change it later. */
