@@ -133,8 +133,9 @@
     <string name="see_pictures">Se bilderna i bildspelet</string>
     <string name="change_album">Byt album eller mapp</string>
     <string name="change_album_hint">Byt valt visningsalbum eller mapp</string>
-    <string name="use_default_album">Använd albumet Wall Intercom</string>
-    <string name="use_default_album_hint">Standardvalet: dit bilder du delar till Wall Intercom hamnar</string>
+    <string name="showing_now">Visas nu</string>
+    <string name="reset_album">Återställ till standardalbumet</string>
+    <string name="reset_album_hint">Visa albumet Wall Intercom, dit bilder du delar hamnar</string>
     <string name="no_pictures_yet">Inga bilder här än.</string>
     <string name="device_online">Online</string>
     <string name="device_offline">Offline</string>

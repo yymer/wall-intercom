@@ -56,6 +56,7 @@ class SettingsActivity : Activity() {
 
     private lateinit var picturesSummary: TextView
     private lateinit var sourceSummary: TextView
+    private lateinit var resetAlbum: View
     private lateinit var devicesCol: LinearLayout
     private var shownDevices: List<CallManager.Device>? = null
 
@@ -162,25 +163,30 @@ class SettingsActivity : Activity() {
     /** For showing something else than the app's own album. */
     private fun buildAlbumPage() {
         section(null) {
-            sourceSummary = navRow(R.string.see_pictures, "") {
-                startActivity(Intent(this, PicturesActivity::class.java))
-            }
+            val r = row()
+            val texts = titleAndHint(getString(R.string.showing_now), "")
+            r.addView(texts)
+            col.addView(r)
+            sourceSummary = texts.getChildAt(1) as TextView
         }
         section(null) {
-            navRow(R.string.use_default_album, getString(R.string.use_default_album_hint)) {
-                prefs.albumId = null
-                prefs.albumName = null
-                prefs.folderUri = null
-                sourceChanged()
-            }
-            navRow(R.string.choose_album) { chooseAlbum() }
-            navRow(R.string.choose_folder) {
+            navRow(R.string.choose_album, arrow = false) { chooseAlbum() }
+            navRow(R.string.choose_folder, arrow = false) {
                 startActivityForResult(
                     Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
                         // Show internal storage right away (Android 5 hides it behind a menu).
                         .putExtra("android.content.extra.SHOW_ADVANCED", true),
                     REQ_FOLDER,
                 )
+            }
+        }
+        // Only there when something else than the default is chosen.
+        resetAlbum = section(null) {
+            navRow(R.string.reset_album, getString(R.string.reset_album_hint), arrow = false) {
+                prefs.albumId = null
+                prefs.albumName = null
+                prefs.folderUri = null
+                sourceChanged()
             }
         }
     }
@@ -403,6 +409,9 @@ class SettingsActivity : Activity() {
         val name = sourceText()
         picturesSummary.text = name
         sourceSummary.text = name
+        // Sharing a photo stores the app's own album as the chosen one, which is still the default.
+        val isDefault = prefs.folderUri == null && (prefs.albumId == null || prefs.albumName == Albums.OWN_ALBUM)
+        resetAlbum.visibility = if (isDefault) View.GONE else View.VISIBLE
         Thread {
             val count = Albums.slideshowImages(contentResolver, prefs).size
             runOnUiThread {
@@ -514,7 +523,7 @@ class SettingsActivity : Activity() {
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 
     /** A heading and a card with the rows that [build] adds. */
-    private fun section(title: Int?, build: () -> Unit) {
+    private fun section(title: Int?, build: () -> Unit): View {
         val outer = col
         if (title != null) {
             outer.addView(TextView(this).apply {
@@ -540,6 +549,7 @@ class SettingsActivity : Activity() {
         outer.addView(card, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
         ).apply { if (title == null) topMargin = dp(20) })
+        return card
     }
 
     private fun LinearLayout.withDividers() = apply {
@@ -695,12 +705,15 @@ class SettingsActivity : Activity() {
         return DateFormat.getTimeFormat(this).format(time.time)
     }
 
-    /** A row that opens something. Returns its hint line, to change it later. */
-    private fun navRow(title: Int, hint: String? = null, onClick: () -> Unit): TextView {
+    /**
+     * A row that does something when tapped, with an arrow if that's going to another page.
+     * Returns its hint line, to change it later.
+     */
+    private fun navRow(title: Int, hint: String? = null, arrow: Boolean = true, onClick: () -> Unit): TextView {
         val r = row()
         val texts = titleAndHint(getString(title), hint)
         r.addView(texts, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        r.addView(rowText("›", 26f, TEXT_SECONDARY).apply { setPadding(dp(16), 0, 0, 0) })
+        if (arrow) r.addView(rowText("›", 26f, TEXT_SECONDARY).apply { setPadding(dp(16), 0, 0, 0) })
         r.clickable(onClick)
         col.addView(r)
         return texts.getChildAt(texts.childCount - 1) as TextView

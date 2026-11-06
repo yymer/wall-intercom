@@ -134,8 +134,9 @@
     <string name="see_pictures">See the pictures in the slideshow</string>
     <string name="change_album">Change album or folder</string>
     <string name="change_album_hint">Change the album or folder being shown</string>
-    <string name="use_default_album">Use the Wall Intercom album</string>
-    <string name="use_default_album_hint">The default: where photos you share to Wall Intercom end up</string>
+    <string name="showing_now">Showing now</string>
+    <string name="reset_album">Reset to default album</string>
+    <string name="reset_album_hint">Show the Wall Intercom album, where photos you share end up</string>
     <string name="no_pictures_yet">No pictures here yet.</string>
     <string name="device_online">Online</string>
     <string name="device_offline">Offline</string>
