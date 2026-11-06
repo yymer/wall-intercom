@@ -1,7 +1,8 @@
 # Wall Intercom
 
 Turn old (or new) Android tablets into wall-mounted **photo frames that double as a video intercom**
-between rooms. There's no server, no cloud and no account: the tablets find each other on your
+between rooms. <br>
+There's no server, no cloud and no account: the tablets find each other on your
 home Wi-Fi and talk directly to each other.
 
 ![A painting on the tablet, with Call and Bell buttons for two other rooms](docs/main-screen.jpg)
