@@ -73,6 +73,8 @@
     <string name="hd_video">HD-video (1280×720)</string>
     <string name="hw_echo">Inbyggd ekosläckning</string>
     <string name="h_permissions">Behörigheter</string>
+    <string name="state_on">På</string>
+    <string name="state_off">Av</string>
     <string name="allow_overlay">Tillåt att appen visas över andra appar</string>
     <string name="allow_battery">Låt inte Android försätta appen i viloläge</string>
     <string name="already_allowed">Redan tillåtet</string>

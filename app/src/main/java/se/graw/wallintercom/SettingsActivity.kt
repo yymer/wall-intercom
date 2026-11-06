@@ -57,6 +57,8 @@ class SettingsActivity : Activity() {
     private lateinit var picturesSummary: TextView
     private lateinit var sourceSummary: TextView
     private lateinit var resetAlbum: View
+    private var overlayState: TextView? = null
+    private var batteryState: TextView? = null
     private lateinit var devicesCol: LinearLayout
     private var shownDevices: List<CallManager.Device>? = null
 
@@ -142,10 +144,10 @@ class SettingsActivity : Activity() {
         // Android 5 has neither of these restrictions, so nothing to allow there.
         if (Build.VERSION.SDK_INT >= 23) {
             section(R.string.h_permissions) {
-                navRow(R.string.allow_overlay) {
+                overlayState = navRow(R.string.allow_overlay, "") {
                     startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
                 }
-                navRow(R.string.allow_battery) { allowBattery() }
+                batteryState = navRow(R.string.allow_battery, "") { allowBattery() }
             }
         }
         section(null) {
@@ -264,6 +266,7 @@ class SettingsActivity : Activity() {
         CallManager.pingNow()
         handler.post(refreshDevices)
         refreshSource()
+        refreshPermissions()
     }
 
     override fun onPause() {
@@ -301,6 +304,16 @@ class SettingsActivity : Activity() {
         if (requestCode != REQ_READ) return
         if (results.firstOrNull() == PackageManager.PERMISSION_GRANTED) showAlbums()
         else toast(getString(R.string.need_photo_permission))
+    }
+
+    /** They're changed in Android's own screens, so this runs on coming back from those. */
+    private fun refreshPermissions() {
+        if (Build.VERSION.SDK_INT < 23) return
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        overlayState?.setText(if (Settings.canDrawOverlays(this)) R.string.state_on else R.string.state_off)
+        batteryState?.setText(
+            if (pm.isIgnoringBatteryOptimizations(packageName)) R.string.state_on else R.string.state_off
+        )
     }
 
     private fun allowBattery() {

@@ -74,6 +74,8 @@
     <string name="hd_video">HD video (1280×720)</string>
     <string name="hw_echo">Built-in echo cancellation</string>
     <string name="h_permissions">Permissions</string>
+    <string name="state_on">On</string>
+    <string name="state_off">Off</string>
     <string name="allow_overlay">Allow waking up over other apps</string>
     <string name="allow_battery">Don\'t let Android put this app to sleep</string>
     <string name="already_allowed">Already allowed</string>
