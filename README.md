@@ -174,8 +174,8 @@ To make it impossible to leave the app (no status bar, no recent apps), make it
 adb shell dpm set-device-owner se.graw.wallintercom/.AdminReceiver
 ```
 
-The app then pins itself on screen and disables the lock screen. The *Open Android settings*
-button in the app's settings temporarily unpins it. **Note:** undoing device owner (and then
+The app then pins itself on screen and disables the lock screen. *Open Android settings*
+in *Advanced settings* temporarily unpins it. **Note:** undoing device owner (and then
 uninstalling the app) requires a factory reset, so try the app without this step first.
 
 ## Troubleshooting

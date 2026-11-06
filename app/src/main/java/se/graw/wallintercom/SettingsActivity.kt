@@ -139,20 +139,13 @@ class SettingsActivity : Activity() {
             intRow(R.string.call_volume, null, prefs.callVolume, 0..100) { prefs.callVolume = it }
             intRow(R.string.bell_volume, null, prefs.bellVolume, 0..100) { prefs.bellVolume = it }
         }
-        section(R.string.h_permissions) {
-            // Android 5 has neither of these restrictions, so nothing to allow there.
-            if (Build.VERSION.SDK_INT >= 23) {
+        // Android 5 has neither of these restrictions, so nothing to allow there.
+        if (Build.VERSION.SDK_INT >= 23) {
+            section(R.string.h_permissions) {
                 navRow(R.string.allow_overlay) {
                     startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
                 }
                 navRow(R.string.allow_battery) { allowBattery() }
-            }
-            navRow(R.string.open_android_settings) {
-                try {
-                    stopLockTask()
-                } catch (_: Exception) {
-                }
-                startActivity(Intent(Settings.ACTION_SETTINGS))
             }
         }
         section(null) {
@@ -195,6 +188,14 @@ class SettingsActivity : Activity() {
         section(R.string.h_this_device) {
             switchRow(R.string.use_as_home, R.string.use_as_home_hint, Prefs.HomeScreen.isEnabled(this)) {
                 Prefs.HomeScreen.setEnabled(this, it)
+            }
+            // The way out of the locked-down kiosk mode (see README), where nothing else leads here.
+            navRow(R.string.open_android_settings) {
+                try {
+                    stopLockTask()
+                } catch (_: Exception) {
+                }
+                startActivity(Intent(Settings.ACTION_SETTINGS))
             }
         }
         section(R.string.h_calls) {
