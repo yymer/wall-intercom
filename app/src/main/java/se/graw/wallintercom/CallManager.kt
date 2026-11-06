@@ -554,7 +554,9 @@ object CallManager {
                 c.pendingAuth = null
                 c.session = Session(p.key, nc, ns, isClient = false)
                 c.peerId = p.id
-                c.remoteAddress?.hostAddress?.let { Peers.updateAddress(p.id, it) }
+                // A port forward (like adb's to an emulator) makes the peer seem to come from loopback,
+                // which would be ourselves if we tried to connect back to it.
+                c.remoteAddress?.takeUnless { it.isLoopbackAddress }?.hostAddress?.let { Peers.updateAddress(p.id, it) }
                 setOnline(p.id, true)
             }
             "pair" -> onPairRequest(c, m)
