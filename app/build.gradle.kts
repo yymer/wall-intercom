@@ -7,7 +7,7 @@ plugins {
 }
 
 // The only place to change for a new version; versionCode follows (1.2.3 -> 10203).
-val appVersion = "1.0.0"
+val appVersion = "1.0.1"
 val appVersionCode = appVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
     major * 10_000 + minor * 100 + patch
 }
