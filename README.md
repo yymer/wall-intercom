@@ -26,7 +26,8 @@ hasn't had an independent security review, so bug reports and code reviews are v
 **Contents:** [Features](#features) · [Requirements](#requirements) ·
 [Set up each tablet](#set-up-each-tablet) · [Updating](#updating) ·
 [Keeping the tablets plugged in](#keeping-the-tablets-plugged-in) · [Settings](#settings) ·
-[Security and privacy](#security-and-privacy) · [Kiosk lock-down](#optional-full-kiosk-lock-down) ·
+[Security and privacy](#security-and-privacy) ·
+[Kiosk lock-down](#optional-full-kiosk-lock-down-experimental) ·
 [Troubleshooting](#troubleshooting) · [How it works](#how-it-works) ·
 [Build it yourself](#build-it-yourself)
 
@@ -204,7 +205,13 @@ Found a security problem? Please report it privately through
 [GitHub's vulnerability reporting](https://github.com/yymer/wall-intercom/security/advisories/new)
 rather than in a public issue.
 
-## Optional: full kiosk lock-down
+## Optional: full kiosk lock-down (experimental)
+
+> ⚠️ **This mode is experimental. Don't try it unless you're prepared to factory reset the tablet
+> if something goes wrong, which erases everything on it.** Once it's on, Android won't let you
+> uninstall the app, even with `adb`. So far it has only been tested on an Android 10 emulator, not
+> on real tablets, and calls and bells haven't been tested in this mode. For most people,
+> *Use as home screen* is enough.
 
 To make it impossible to leave the app (no status bar, no recent apps), make it *device owner*.
 This only works on a tablet with **no Google or other accounts** added, so remove them first or
@@ -217,8 +224,16 @@ adb shell dpm set-device-owner se.graw.wallintercom/.AdminReceiver
 The app then pins itself on screen and, on Android 6 and newer, disables the lock screen.
 *Open Android settings* under *Advanced settings* temporarily unpins it.
 
-**Try the app without this step first:** undoing device owner, and then uninstalling the app,
-requires a factory reset.
+To undo it, press *Stop being device owner* under *Advanced settings*. You can then leave and
+uninstall the app as usual. This button is the only way out short of a factory reset. Anyone who
+can open the settings can press it too, so this mode stops casual use rather than someone
+determined.
+
+**Install the build you want to keep first:** Android only installs updates signed with the same
+key, and you can't uninstall the app while it's device owner. To update, use
+`adb install -r wall-intercom-<version>.apk`. The app doesn't reopen by itself after an update and
+isn't pinned until it's opened again, so open it afterwards, for example with
+`adb shell am start -n se.graw.wallintercom/.MainActivity`.
 
 ## Troubleshooting
 
@@ -285,6 +300,21 @@ You need JDK 17 or 21 and the Android SDK with platform 35. `build.sh` uses `JAV
 These are debug builds, signed with your machine's debug key. Android only installs an update
 signed with the same key as the installed app, so to switch between your own builds and the
 published ones, uninstall first. That removes the tablet's pairings, so they need pairing again.
+
+### Testing the kiosk mode
+
+This test runs the whole [kiosk mode](#optional-full-kiosk-lock-down-experimental) cycle on a
+release build, including getting out with *Stop being device owner*. Run it before each release,
+or after changing anything to do with this mode:
+
+```bash
+test/device_owner_test.py --avd <emulator name>  # see: emulator -list-avds
+```
+
+It builds the APK and starts its own read-only emulator, and refuses to run on anything else. Use
+an English emulator image with no accounts. It needs a signing key: a `keystore.properties` next
+to `build.sh`, with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. It leaves
+`build/wall-intercom-test.apk` behind, which also contains emulator code, so don't publish that one.
 
 ## Contributing
 
