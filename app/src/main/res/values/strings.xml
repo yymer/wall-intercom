@@ -138,7 +138,7 @@
     <string name="hw_echo_hint">Use the device\'s own instead of WebRTC\'s. Try it if you get echo.</string>
     <string name="auto_answer_hint">The camera turns on without anyone pressing Answer</string>
     <string name="auto_start_hint">So it can take calls after a restart</string>
-    <string name="use_as_home_hint">The Home button and restarts always come back here. For devices that only run Wall Intercom.</string>
+    <string name="use_as_home_hint">Then choose Wall Intercom as the home app, so the Home button and restarts always come back here. For devices that only run Wall Intercom.</string>
     <string name="port_hint">Must be the same on all devices</string>
     <string name="h_advanced">Advanced settings</string>
     <string name="advanced_hint">Home screen, video and sound options, network</string>

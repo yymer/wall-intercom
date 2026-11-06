@@ -137,7 +137,7 @@
     <string name="hw_echo_hint">Använd enhetens egen i stället för WebRTC:s. Prova om det ekar.</string>
     <string name="auto_answer_hint">Kameran slås på utan att någon trycker på Svara</string>
     <string name="auto_start_hint">Så att den kan ta emot samtal efter en omstart</string>
-    <string name="use_as_home_hint">Hemknappen och omstarter kommer alltid tillbaka hit. För enheter som bara kör Wall Intercom.</string>
+    <string name="use_as_home_hint">Välj sedan Wall Intercom som startskärmsapp, så kommer hemknappen och omstarter alltid tillbaka hit. För enheter som bara kör Wall Intercom.</string>
     <string name="port_hint">Måste vara samma på alla enheter</string>
     <string name="h_advanced">Avancerade inställningar</string>
     <string name="advanced_hint">Startskärm, video och ljud, nätverk</string>
