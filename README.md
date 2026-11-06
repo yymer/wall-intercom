@@ -107,7 +107,8 @@ Calls only work within your home network. Wall Intercom can't call a tablet some
    show the same code, then press **Accept** on the other one. With more than two tablets, pair
    each two that should be able to call each other.
 7. **Optional, for a tablet that only runs Wall Intercom:** turn on *Use as home screen* under
-   *Advanced settings*. Android's list of home apps opens, so choose **Wall Intercom**. The Home
+   *Advanced settings*. Android's list of home apps opens, so choose **Wall Intercom** (on
+   Android 5, tap the round button beside the name, not the name). The Home
    button and restarts then always come back to the app. If that list doesn't open, press the
    Home button and choose **Wall Intercom → Always**, or look for *Default home app* in Android's
    settings. To undo it, turn the switch off again.
