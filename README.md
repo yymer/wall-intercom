@@ -315,34 +315,6 @@ A few things to keep in mind:
 
 By contributing, you agree that your contribution is licensed under the [MIT license](LICENSE).
 
-## Publishing a release
-
-For maintainers. Create a signing key once:
-
-```bash
-keytool -genkeypair -keystore ~/wall-intercom-release.jks -alias wall-intercom \
-  -keyalg RSA -keysize 4096 -validity 10000
-```
-
-**Back up the key and its password somewhere safe.** Without them, nobody can get updates without
-uninstalling the app and pairing their tablets again. Don't commit them.
-
-Next to `build.sh`, create `keystore.properties` (git ignores it):
-
-```properties
-storeFile=/home/you/wall-intercom-release.jks
-storePassword=...
-keyAlias=wall-intercom
-keyPassword=...
-```
-
-For each release:
-
-1. Set `appVersion` at the top of `app/build.gradle.kts` (the `versionCode` follows from it).
-2. Run `./build.sh release`.
-3. Tag the commit, e.g. `v1.0.0`.
-4. Attach `wall-intercom-<version>.apk` and its `.sha256` file to a GitHub release.
-
 ## License
 
 [MIT](LICENSE)
