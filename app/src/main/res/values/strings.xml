@@ -80,10 +80,6 @@
     <string name="allow_battery">Don\'t let Android put this app to sleep</string>
     <string name="already_allowed">Already allowed</string>
     <string name="open_android_settings">Open Android settings</string>
-    <string name="stop_device_owner">Stop being device owner</string>
-    <string name="stop_device_owner_hint">Ends the locked-down kiosk mode, so the app can be left and uninstalled normally</string>
-    <string name="stop_device_owner_confirm">End the locked-down kiosk mode? To turn it on again, you\'ll need a computer, and no accounts on the tablet.</string>
-    <string name="stop_device_owner_done">Kiosk mode ended</string>
     <string name="cancel">Cancel</string>
     <string name="bell_button">Bell</string>
     <string name="bell_from">🔔 Bell from %1$s</string>
