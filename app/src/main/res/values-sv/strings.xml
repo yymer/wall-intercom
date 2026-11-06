@@ -79,6 +79,10 @@
     <string name="allow_battery">Låt inte Android försätta appen i viloläge</string>
     <string name="already_allowed">Redan tillåtet</string>
     <string name="open_android_settings">Öppna Androids inställningar</string>
+    <string name="stop_device_owner">Sluta vara enhetsägare</string>
+    <string name="stop_device_owner_hint">Avslutar det låsta kioskläget, så att appen kan lämnas och avinstalleras som vanligt</string>
+    <string name="stop_device_owner_confirm">Avsluta det låsta kioskläget? För att slå på det igen behöver du en dator, och inga konton på surfplattan.</string>
+    <string name="stop_device_owner_done">Kioskläget är avslutat</string>
     <string name="cancel">Avbryt</string>
     <string name="bell_button">Pling</string>
     <string name="bell_from">🔔 Det plingar från %1$s</string>

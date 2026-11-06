@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.TimePickerDialog
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -205,6 +207,15 @@ class SettingsActivity : Activity() {
             }
             // The way out of the locked-down kiosk mode (see README), where nothing else leads here.
             navRow(R.string.open_android_settings) { openAndroidSettings(Settings.ACTION_SETTINGS) }
+            if ((getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager).isDeviceOwnerApp(packageName)) {
+                navRow(R.string.stop_device_owner, getString(R.string.stop_device_owner_hint)) {
+                    AlertDialog.Builder(this@SettingsActivity)
+                        .setMessage(R.string.stop_device_owner_confirm)
+                        .setPositiveButton(R.string.stop_device_owner) { _, _ -> stopDeviceOwner() }
+                        .setNegativeButton(R.string.cancel, null)
+                        .show()
+                }
+            }
         }
         section(R.string.h_calls) {
             intRow(R.string.max_minutes, R.string.max_minutes_hint, prefs.maxCallMinutes, 0..1440) {
@@ -716,6 +727,26 @@ class SettingsActivity : Activity() {
             startActivity(Intent(action))
         } catch (_: ActivityNotFoundException) {
             startActivity(Intent(Settings.ACTION_SETTINGS))
+        }
+    }
+
+    /** Undoes the locked-down kiosk mode (see README), so the app can be left and uninstalled normally. */
+    private fun stopDeviceOwner() {
+        val dpm = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val admin = ComponentName(this, AdminReceiver::class.java)
+        try {
+            stopLockTask()
+        } catch (_: Exception) {
+        }
+        try {
+            dpm.setLockTaskPackages(admin, emptyArray())
+            if (Build.VERSION.SDK_INT >= 23) dpm.setKeyguardDisabled(admin, false)
+            @Suppress("DEPRECATION")
+            dpm.clearDeviceOwnerApp(packageName)
+            toast(getString(R.string.stop_device_owner_done))
+            recreate()
+        } catch (e: SecurityException) {
+            toast(e.message ?: e.toString())
         }
     }
 
