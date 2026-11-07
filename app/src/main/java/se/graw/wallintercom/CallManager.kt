@@ -2,9 +2,11 @@ package se.graw.wallintercom
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.MediaPlayer
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -196,6 +198,8 @@ object CallManager {
     private var iceState: PeerConnection.IceConnectionState? = null
     private var audioActive = false
     private var savedAudioMode = AudioManager.MODE_NORMAL
+    private var focusRequest: Any? = null // an AudioFocusRequest, on Android 8 and newer
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { }
     private var sessionId = ""
     private var isCaller = false
     private var reconnectDeadline = 0L
@@ -1188,6 +1192,7 @@ object CallManager {
     private fun startCallAudio() {
         val am = audioManager()
         savedAudioMode = am.mode
+        takeAudioFocus(am)
         am.mode = AudioManager.MODE_IN_COMMUNICATION
         am.isSpeakerphoneOn = true
         am.isMicrophoneMute = false
@@ -1202,6 +1207,38 @@ object CallManager {
         val am = audioManager()
         am.isSpeakerphoneOn = false
         am.mode = savedAudioMode
+        releaseAudioFocus(am)
+    }
+
+    /** Asks other apps playing music, radio or videos to pause until the call is over. */
+    private fun takeAudioFocus(am: AudioManager) {
+        if (Build.VERSION.SDK_INT >= 26) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setOnAudioFocusChangeListener(focusListener)
+                .build()
+            focusRequest = request
+            am.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(focusListener, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+        }
+    }
+
+    /** Lets the other apps play again. */
+    private fun releaseAudioFocus(am: AudioManager) {
+        if (Build.VERSION.SDK_INT >= 26) {
+            (focusRequest as? AudioFocusRequest)?.let { am.abandonAudioFocusRequest(it) }
+            focusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            am.abandonAudioFocus(focusListener)
+        }
     }
 
     /** Short "ding-ding" so people in the room know the camera just went live. */

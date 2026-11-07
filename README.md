@@ -317,6 +317,20 @@ an English emulator image with no accounts. It needs a signing key: a `keystore.
 to `build.sh`, with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. It leaves
 `build/wall-intercom-test.apk` behind, which also contains emulator code, so don't publish that one.
 
+### Testing calls
+
+This test pairs two tablets and calls between them. It checks that video reaches the screen, also
+after *Use as home screen* has been turned on and off, and that other apps' sound pauses during a
+call. Run it after changing anything to do with calls or the main screen:
+
+```bash
+test/call_test.py --avd <emulator name>
+```
+
+It builds a debug APK and starts two read-only copies of the emulator, which is slow but leaves
+nothing behind. Two emulators can't send each other video, so it checks each tablet's view of its
+own camera, which goes to the screen the same way.
+
 ## Contributing
 
 Contributions are welcome, and you don't have to write code: bug reports, translations and hearing
