@@ -100,8 +100,6 @@ class MainActivity : Activity(), CallManager.Listener {
         localView.setZOrderMediaOverlay(true)
         localView.setMirror(true)
         localView.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
-        CallManager.remoteSink.target = remoteView
-        CallManager.localSink.target = localView
 
         findViewById<View>(R.id.root).setOnClickListener { onScreenTouched() }
         overlay.setOnClickListener { hideOverlay() }
@@ -137,6 +135,10 @@ class MainActivity : Activity(), CallManager.Listener {
             return
         }
         resumed = true
+        // Call video goes to the screen in front. There can be two of these screens, the app and
+        // the Home screen, and either may be closed while the other stays.
+        CallManager.remoteSink.target = remoteView
+        CallManager.localSink.target = localView
         hideSystemUi()
         lockTaskIfDeviceOwner()
         CallManager.listener = this
@@ -162,8 +164,9 @@ class MainActivity : Activity(), CallManager.Listener {
     }
 
     override fun onDestroy() {
-        CallManager.remoteSink.target = null
-        CallManager.localSink.target = null
+        // Only let go of the video if it's still ours: the other screen may have it now.
+        if (CallManager.remoteSink.target === remoteView) CallManager.remoteSink.target = null
+        if (CallManager.localSink.target === localView) CallManager.localSink.target = null
         remoteView.release()
         localView.release()
         io.shutdownNow()
