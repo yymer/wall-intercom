@@ -217,6 +217,7 @@ object CallManager {
         initialized = true
         ctx = context.applicationContext
         prefs = Prefs(ctx)
+        unmuteMedia(audioManager()) // in case the app was stopped during a call
         Peers.init(ctx)
         eglBase = EglBase.create()
         PeerConnectionFactory.initialize(
@@ -1193,6 +1194,7 @@ object CallManager {
         val am = audioManager()
         savedAudioMode = am.mode
         takeAudioFocus(am)
+        muteMedia(am)
         am.mode = AudioManager.MODE_IN_COMMUNICATION
         am.isSpeakerphoneOn = true
         am.isMicrophoneMute = false
@@ -1207,7 +1209,36 @@ object CallManager {
         val am = audioManager()
         am.isSpeakerphoneOn = false
         am.mode = savedAudioMode
+        unmuteMedia(am)
         releaseAudioFocus(am)
+    }
+
+    /**
+     * Some players, like Snapcast, ignore audio focus and keep playing. So media sound is also muted
+     * during the call. The call itself, the bell and the chime use other volumes and aren't affected.
+     */
+    private fun muteMedia(am: AudioManager) {
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (am.isStreamMute(AudioManager.STREAM_MUSIC)) return // muted already: leave it to whoever did
+            prefs.mutedMediaForCall = true
+            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0)
+        } else {
+            // Before Android 6 this mute belongs to the app, and Android undoes it if the app stops.
+            @Suppress("DEPRECATION")
+            am.setStreamMute(AudioManager.STREAM_MUSIC, true)
+            prefs.mutedMediaForCall = true
+        }
+    }
+
+    private fun unmuteMedia(am: AudioManager) {
+        if (!prefs.mutedMediaForCall) return
+        prefs.mutedMediaForCall = false
+        if (Build.VERSION.SDK_INT >= 23) {
+            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
+        } else {
+            @Suppress("DEPRECATION") // does nothing if Android has undone the mute already
+            am.setStreamMute(AudioManager.STREAM_MUSIC, false)
+        }
     }
 
     /** Asks other apps playing music, radio or videos to pause until the call is over. */

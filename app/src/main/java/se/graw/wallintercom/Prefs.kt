@@ -58,6 +58,8 @@ class Prefs(ctx: Context) {
     var hdVideo: Boolean get() = bool("hdVideo", false); set(v) = put("hdVideo", v)
     var bellVolume: Int get() = int("bellVolume", 80); set(v) = put("bellVolume", v)
     var hwEcho: Boolean get() = bool("hwEcho", false); set(v) = put("hwEcho", v)
+    /** Media sound is muted for a call, so it can be unmuted even if the app was stopped mid-call. */
+    var mutedMediaForCall: Boolean get() = bool("mutedMediaForCall", false); set(v) = put("mutedMediaForCall", v)
     /** Start the app (and listen for calls) when the tablet is turned on. Off by default. */
     var autoStart: Boolean get() = bool("autoStart", false); set(v) = put("autoStart", v)
     /** Off by default: someone in the room has to press Answer before the camera turns on. */
