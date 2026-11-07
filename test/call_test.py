@@ -2,7 +2,7 @@
 """
 Tests calls between two tablets: that the answering tablet shows video, also after its main screen
 has been opened twice (as the Home screen and as the normal app, which once left every later call
-without video), and that other sound pauses during a call.
+without video), and that other sound pauses or is muted during a call.
 
     test/call_test.py --avd <name of an Android emulator>
 
@@ -163,6 +163,12 @@ def has_audio_focus(dev):
     return len(stack) > 1 and f"pack: {PKG}" in stack[1].split("\n\n")[0]
 
 
+def media_muted(dev):
+    """Whether media sound is muted, which silences players that ignore audio focus."""
+    m = re.search(r"- STREAM_MUSIC:\s*\n\s*Muted: (\w+)", sh(dev, "dumpsys", "audio"))
+    return bool(m) and m[1] == "true"
+
+
 def call(label):
     """The caller calls the wall tablet, which answers. Checks that its own camera reaches the screen,
     and that it pauses other sound during the call."""
@@ -177,9 +183,11 @@ def call(label):
     print(f"      frames on the wall tablet: {got}, on the caller: {frames(CALLER)}", flush=True)
     check(f"{label}: the wall tablet shows its camera on screen", got["localView"] > 0, got)
     check(f"{label}: other sound is paused on both", has_audio_focus(WALL) and has_audio_focus(CALLER))
+    check(f"{label}: media sound is muted on both", media_muted(WALL) and media_muted(CALLER))
     tap(WALL, "End call")
     time.sleep(4)
     check(f"{label}: other sound may play again after the call", not has_audio_focus(WALL) and not has_audio_focus(CALLER))
+    check(f"{label}: media sound is unmuted after the call", not media_muted(WALL) and not media_muted(CALLER))
 
 
 def announce(dev):

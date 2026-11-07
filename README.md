@@ -320,8 +320,8 @@ to `build.sh`, with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. 
 ### Testing calls
 
 This test pairs two tablets and calls between them. It checks that video reaches the screen, also
-after *Use as home screen* has been turned on and off, and that other apps' sound pauses during a
-call. Run it after changing anything to do with calls or the main screen:
+after *Use as home screen* has been turned on and off, and that other apps' sound pauses or is
+muted during a call. Run it after changing anything to do with calls or the main screen:
 
 ```bash
 test/call_test.py --avd <emulator name>
